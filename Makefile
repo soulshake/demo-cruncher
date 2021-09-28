@@ -206,7 +206,7 @@ apply-debug:
 
 .PHONY: nodes-show
 nodes-show: ## Show node groups
-	kubectl get nodes -o custom-columns-file=columns.txt --sort-by 'metadata.labels.eks\.amazonaws\.com\/nodegroup'
+	kubectl get nodes -o custom-columns-file=$(ROOT)/columns.txt --sort-by 'metadata.labels.eks\.amazonaws\.com\/nodegroup'
 
 .PHONY: asg-list
 asg-list: ## List autoscaling groups

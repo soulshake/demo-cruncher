@@ -34,17 +34,3 @@ provider "aws" {
   }
   # no assume_role here; credentials are set via environment variables to avoid Terraform+MFA problems
 }
-
-###
-### k8s providers
-###
-
-provider "kubernetes" {
-  host = "all-k8s-resources-must-specify-a-provider"
-}
-provider "kubernetes" {
-  alias                  = "demo"
-  host                   = module.cluster.auth.host
-  cluster_ca_certificate = nonsensitive(module.cluster.auth.cluster_ca_certificate)
-  token                  = module.cluster.auth.token
-}

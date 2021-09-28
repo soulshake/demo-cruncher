@@ -40,6 +40,22 @@ resource "aws_eks_cluster" "current" {
   depends_on = [aws_cloudwatch_log_group.cluster]
 }
 
+data "tls_certificate" "cluster" {
+  # Used for obtaining the thumbprints provided to the OIDC provider
+  # h/t https://marcincuber.medium.com/amazon-eks-with-oidc-provider-iam-roles-for-kubernetes-services-accounts-59015d15cb0c
+  # url = data.aws_eks_cluster.platform.identity.0.oidc.0.issuer
+  url = aws_eks_cluster.current.identity.0.oidc.0.issuer
+}
+
+resource "aws_iam_openid_connect_provider" "default" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.cluster.certificates.0.sha1_fingerprint]
+  url             = aws_eks_cluster.current.identity.0.oidc.0.issuer
+  tags = merge(local.tags, {
+    Name = "${terraform.workspace}-oidc-provider"
+  })
+}
+
 # aws-auth configMap
 resource "kubernetes_config_map" "aws_auth" {
   # Tip: ensure node pools depend on this resource; otherwise it gets automatically created, so our own creation fails.
@@ -57,10 +73,6 @@ resource "kubernetes_config_map" "aws_auth" {
   groups:
   - system:bootstrappers
   - system:nodes
-- rolearn: arn:aws:iam::${local.id}:user/ajbowen
-  username: aj
-  groups:
-  - system:masters
 MAPROLES
 
     mapAccounts = <<MAPACCOUNTS
@@ -74,10 +86,6 @@ resource "aws_cloudwatch_log_group" "cluster" {
   # Reference: https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html
   name              = "/aws/eks/${local.name}/cluster"
   retention_in_days = 30
-}
-
-data "aws_eks_cluster_auth" "current" {
-  name = aws_eks_cluster.current.name
 }
 
 # Networking
@@ -193,27 +201,18 @@ resource "helm_release" "metrics_server" {
 ### Node groups
 ###
 
-locals {
-  # TODO: custom AMI: https://github.com/terraform-aws-modules/terraform-aws-eks/pull/997/files
-  ami_types = {
-    cpu = "AL2_x86_64" # default
-    gpu = "AL2_x86_64_GPU"
-  }
-  cluster_node_role_name = "demo-node"
-}
-
 # data "aws_iam_role"
 resource "aws_eks_node_group" "ng" {
   # all instances in node group should be the same instance type, or at least have the same vCPU and memory resources.
   # see: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
   for_each        = { for subnet in aws_subnet.current[*] : subnet.id => subnet }
-  ami_type        = local.ami_types["cpu"]
+  ami_type        = "AL2_x86_64" # or AL2_x86_64_GPU
   capacity_type   = "SPOT"
   cluster_name    = aws_eks_cluster.current.name
   disk_size       = 50
   instance_types  = ["t3.medium"]
   node_group_name = "${terraform.workspace}-normal-${replace(each.value.availability_zone, local.region, "")}"
-  node_role_arn   = one(data.aws_iam_role.node[*].arn) #var.node_role.arn
+  node_role_arn   = one(data.aws_iam_role.node[*].arn)
   subnet_ids      = [each.value.id]
 
   labels = local.labels
@@ -240,14 +239,6 @@ resource "aws_eks_node_group" "ng" {
   # TODO: Also ensure that IAM Role permissions are created before and deleted after EKS Node Group handling,
   # otherwise, EKS will not be able to properly delete EC2 Instances and Elastic Network Interfaces.
   depends_on = [kubernetes_config_map.aws_auth]
-
-  # If this is a GPU-enabled node group, taint the nodes so that non-GPU-needy pods can't run there.
-  # taint {
-  # key    = "nvidia.com/gpu"
-  # effect = "NO_SCHEDULE"
-  # value  = true
-  # }
-  # }
 }
 
 ###
@@ -295,10 +286,10 @@ data "aws_iam_policy_document" "cluster_node_policy_doc" {
 
 resource "aws_iam_role_policy_attachment" "cluster_node_iam_role_attachment" {
   policy_arn = one(aws_iam_policy.cluster_node_policy[*].arn)
-  role       = local.cluster_node_role_name
+  role       = data.aws_iam_role.node.name
 }
 
 resource "aws_iam_role_policy_attachment" "node_plus_cloudwatch_agent" {
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
-  role       = local.cluster_node_role_name
+  role       = data.aws_iam_role.node.name
 }

@@ -96,6 +96,12 @@ resource "aws_iam_role_policy_attachment" "node_container_registry_ro" {
 resource "aws_iam_instance_profile" "nodes" {
   name = local.name
   role = one(aws_iam_role.node[*].name)
-  tags = local.tags
 }
 
+resource "aws_ecr_repository" "queue-watcher" {
+  name = "queue-watcher"
+}
+
+resource "aws_ecr_repository" "cruncher" {
+  name = "cruncher"
+}

@@ -1,0 +1,78 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: demo-${WORKSPACE}-
+spec:
+  backoffLimit: 1
+  completions: 1
+  parallelism: 1
+  ttlSecondsAfterFinished: 21600 # six hours
+  template:
+    metadata:
+      labels:
+        workspace: ${WORKSPACE}
+        app: demo-pipeline
+    spec:
+      # Note: a restartPolicy of OnFailure results in failed pods being deleted. Set this to 'Never' when debugging.
+      # See: https://kubernetes.io/docs/concepts/workloads/controllers/job/#handling-pod-and-container-failures
+      restartPolicy: Never
+      serviceAccountName: cruncher
+      volumes:
+      # Store the SQS message in a volume accessible by all containers
+      - name: state
+        emptyDir: {}
+
+      # Note that init containers do not support lifecycle, livenessProbe, readinessProbe, or startupProbe because they must run to completion before the Pod can be ready.
+      # Also, if an initContainer fails, the containers will be stuck forever in PodInitializing.
+      initContainers:
+      - name: fetch-message
+        image: 731288958074.dkr.ecr.eu-central-1.amazonaws.com/cruncher:${WORKSPACE}
+        imagePullPolicy: Always
+        command:
+        - bash
+        - -c
+        - |
+          /src/crunch.sh fetch-message
+        env:
+        - name: QUEUE_URL
+          value: "${QUEUE_URL}"
+        - name: WORKSPACE
+          value: "${WORKSPACE}"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "200Mi"
+        volumeMounts:
+        - mountPath: "/state"
+          name: state
+
+      ###
+      ### Below, we define the actual job containers (as opposed to initContainers), which run in parallel.
+      ###
+      containers:
+      # Do the actual "work"
+      - name: cruncher-pipeline
+        image: 731288958074.dkr.ecr.eu-central-1.amazonaws.com/cruncher:${WORKSPACE}
+        imagePullPolicy: Always
+        command:
+        - bash
+        - -c
+        - |
+          # Note: if any initContainers fail, containers will be stuck in PodInitializing. Consequently, initContainers may exit 0 even under failure conditions.
+          # Therefore, containers should check for error conditions early and bail if needed.
+          set -euo pipefail
+          duration=$(cat /state/DURATION)
+          target=$(cat /state/TARGET)
+          timeout=$(( duration + 30 ))
+          echo "Pinging ${target} for ${duration} seconds, but first changing visibility to ${timeout}."
+          aws sqs change-message-visibility --queue-url "${QUEUE_URL}" --visibility-timeout "${timeout}" --receipt-handle "$(cat /state/RECEIPT_ID)"
+          ping -w "${duration}" "${target}"
+          set -x
+          aws sqs delete-message --queue-url "${QUEUE_URL}" --receipt-handle "$(cat /state/RECEIPT_ID)"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "100Mi"
+        volumeMounts:
+        - mountPath: "/state"
+          name: state

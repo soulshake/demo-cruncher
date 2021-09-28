@@ -5,10 +5,6 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 3.60.0"
     }
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.3.0"
-    }
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.5.0"
@@ -23,10 +19,6 @@ terraform {
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-output "whoami" {
-  value = data.aws_caller_identity.current.arn
-}
-
 ###
 ### aws provider
 ###
@@ -35,7 +27,6 @@ provider "aws" {
   allowed_account_ids = [731288958074]
   default_tags {
     tags = {
-      cluster   = "demo"
       repo_dir  = basename(abspath(path.root))
       terraform = true
       workspace = terraform.workspace
@@ -48,8 +39,12 @@ provider "aws" {
 ### k8s providers
 ###
 
-data "aws_eks_cluster_auth" "current" {
-  name = aws_eks_cluster.current.name
+data "aws_eks_cluster" "demo" {
+  name = "demo"
+}
+
+data "aws_eks_cluster_auth" "demo" {
+  name = data.aws_eks_cluster.demo.name
 }
 
 provider "kubernetes" {
@@ -57,23 +52,7 @@ provider "kubernetes" {
 }
 provider "kubernetes" {
   alias                  = "demo"
-  host                   = aws_eks_cluster.current.endpoint
-  cluster_ca_certificate = base64decode(aws_eks_cluster.current.certificate_authority.0.data)
-  token                  = data.aws_eks_cluster_auth.current.token
-}
-
-provider "helm" {
-  # Placeholder to ensure all helm resources have an explicit provider as well.
-  kubernetes {
-    host = "all-helm-resources-must-have-a-provider"
-  }
-}
-
-provider "helm" {
-  alias = "demo"
-  kubernetes {
-    host                   = aws_eks_cluster.current.endpoint
-    cluster_ca_certificate = base64decode(aws_eks_cluster.current.certificate_authority.0.data)
-    token                  = data.aws_eks_cluster_auth.current.token
-  }
+  host                   = data.aws_eks_cluster.demo.endpoint
+  cluster_ca_certificate = base64decode(data.aws_eks_cluster.demo.certificate_authority.0.data)
+  token                  = data.aws_eks_cluster_auth.demo.token
 }
