@@ -20,7 +20,6 @@ ifeq ($(SERVICE_NAME), infra)
 endif
 TF_WORKSPACE = $(shell terraform workspace show)
 CAREFUL ?= .validate-workspace
-VERY_CAREFUL = $(CAREFUL) .validate-workspace-strict
 
 # Directories
 ROOT := $(shell git rev-parse --show-toplevel)
@@ -106,13 +105,6 @@ whoami: ## Runs 'aws sts get-caller-identity'
 .PHONY: .validate-workspace
 .validate-workspace: # Print a big warning if we're on the workspace 'default'
 	@. $(UTILS)
-	if [[ "$(TF_WORKSPACE)" == "default" ]]; then
-		log_error "Select a non-default workspace. Your current workspace is '$(TF_WORKSPACE)'"
-	fi
-
-.PHONY: .validate-workspace-strict
-.validate-workspace-strict: # Exit if we're on the workspace 'default'
-	@. $(UTILS)
 	if [ "$(TF_WORKSPACE)" = "default" ]; then
 		log_error "Select a non-default workspace. Your current workspace is '$(TF_WORKSPACE)'"
 		exit 1
@@ -131,7 +123,6 @@ plan-debug: ## Run 'terraform plan' and write debug logs to debug.txt
 	log_notice "Debug logs will be written to debug.txt."
 	TF_LOG=trace make plan 2>&1 | tee debug.txt
 
-
 state.tf:
 	@. $(UTILS)
 	if [ ! -f "$@" ]; then
@@ -139,7 +130,7 @@ state.tf:
 		$(ROOT)/bin/create-state-bucket.sh
 	fi
 
-tfplan plan-output.txt &: .validate-workspace-strict $(DATA_FILES) $(CAREFUL) $(MANIFEST_FILES) $(TF_WORKSPACE_FILE) | $(TF_CONFIG_DIR) state.tf
+tfplan plan-output.txt &: $(CAREFUL) | state.tf
 	@. $(UTILS)
 	log_notice "Generating tfplan and plan-output.txt..."
 	if terraform plan -out=tfplan $(PLAN_TARGET) | tee plan-output.txt; then
@@ -159,7 +150,7 @@ tfplan.json: tfplan
 	terraform show -no-color -json $< | jq . > $@
 
 .PHONY: apply
-apply: $(VERY_CAREFUL) ## Apply the changes in `tfplan` (i.e. after running 'make plan').
+apply: $(CAREFUL) ## Apply the changes in `tfplan` (i.e. after running 'make plan').
 	@. $(UTILS)
 	if [ ! -f "tfplan" ]; then
 		log_error "No tfplan exists. Run 'make plan' to generate it and try again."
