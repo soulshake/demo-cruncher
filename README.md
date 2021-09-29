@@ -53,7 +53,7 @@ Ensure the following environment variables are set:
 
 - `AWS_REGION`
 - `AWS_ACCOUNT_ID`
-- `MAKEFILES=../Makefile` (to be able to run make in subdirectories)
+- `MAKEFILES=../Makefile` (to be able to run `make` in subdirectories)
 - `WORKSPACE=production` (or another value of your choice)
 
 Run `make env` to show the current values of these variables.
