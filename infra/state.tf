@@ -1,9 +1,7 @@
 terraform {
   backend "s3" {
-    bucket = "ephemerasearch-tfstate-infra"
-    region = "eu-central-1"
-    key    = "tfstate"
-    # dynamodb_table = "terraform-state-locks"
+    bucket  = "ephemerasearch-tfstate-infra"
+    key     = "tfstate"
     encrypt = true
   }
 }

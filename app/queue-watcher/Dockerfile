@@ -23,8 +23,5 @@ RUN echo "KUBECTL_VERSION: ${KUBECTL_VERSION}" \
     && kubectl version --client \
     && rm kubectl
 
-ARG AWS_REGION=eu-central-1
-ENV AWS_REGION=$AWS_REGION
 COPY . /src
 WORKDIR /src
-ENTRYPOINT ["/src/watch.sh"]

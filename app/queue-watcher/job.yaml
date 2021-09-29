@@ -70,16 +70,17 @@ spec:
       containers:
       # Do the actual "work"
       - name: cruncher-pipeline
-        image: busybox:latest
+        image: amazon/aws-cli
         imagePullPolicy: Always
         command:
-        - bash
+        - sh
         - -c
         - |
           set -euo pipefail
           duration=$(cat /state/DURATION)
           target=$(cat /state/TARGET)
           timeout=$(( duration + 30 ))
+          yum install -y iputils
           echo "Pinging ${target} for ${duration} seconds, but first changing visibility to ${timeout}."
           aws sqs change-message-visibility --queue-url "${QUEUE_URL}" --visibility-timeout "${timeout}" --receipt-handle "$(cat /state/RECEIPT_ID)"
           ping -w "${duration}" "${target}"

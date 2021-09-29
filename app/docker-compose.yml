@@ -3,18 +3,11 @@ version: "3.4"
 # For descriptions of the various services defined here, see the `platform` README.
 
 services:
-  cruncher:
-    build:
-      args:
-        BUILDKIT_INLINE_CACHE: 1
-      cache_from:
-        - ${REGISTRY_SLASH}cruncher${COLON_TAG}
-      context: ./cruncher
-    image: ${REGISTRY_SLASH?Please set REGISTRY_SLASH}cruncher${COLON_TAG?Please set COLON_TAG}
   queue-watcher:
     build:
       args:
         BUILDKIT_INLINE_CACHE: 1
+        AWS_REGION:
       cache_from:
         - ${REGISTRY_SLASH}cruncher${COLON_TAG}
       context: ./queue-watcher

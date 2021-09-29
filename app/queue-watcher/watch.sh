@@ -60,21 +60,19 @@ main() {
         to_create=$((mc - pc))
         if [ "${to_create}" -lt 1 ]; then
             log_verbose "There at least as many pending jobs as messages in the queue (${pc} >= ${mc}). Taking a nap."
-            sleep 10 && continue
+            sleep 3 && continue
         fi
         log_success "${mc} messages in the queue; ${pc} pending pods. Creating ${to_create} job(s), within the limits of MAX_PENDING (${MAX_PENDING})."
         while [ "${to_create}" -ge 1 ]; do
             block_if_too_many_pending
             if kickoff_job; then
                 log_success "Kicked off job"
-                sleep 5
             else
                 log_error "Couldn't kickoff job"
                 sleep 20
             fi
             to_create=$((to_create - 1))
             log_verbose "${to_create} left to create."
-            sleep 1
         done
         log_success "No more to create."
         sleep 3

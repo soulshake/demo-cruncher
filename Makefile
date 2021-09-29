@@ -20,16 +20,6 @@ UTILS = $(ROOT)/bin/utils.sh
 ### Env-specific changes
 ###
 
-# If notify-send is installed, send desktop notifications after plan/apply operations.
-NOTIFY = $(shell which notify-send)
-ifeq ($(NOTIFY),)
-	NOTIFY = $$(which echo)
-	URGENCY =
-else
-	NOTIFY += --expire-time 3000
-	URGENCY = -u low
-endif
-
 # allow targeting specific resources during plan/apply
 TARGET ?=
 ifneq ($(TARGET),)
@@ -138,17 +128,7 @@ state.tf:
 	fi
 
 tfplan: $(CAREFUL) | state.tf
-	@. $(UTILS)
-	log_notice "Generating tfplan and plan-output.txt..."
-	if terraform plan -out=tfplan $(PLAN_TARGET) | tee plan-output.txt; then
-		ret=$$?
-		$(NOTIFY) $(URGENCY) "Done!" "Planning finished: $$(basename $${PWD})"
-	else
-		ret=$$?
-		[ -n "$(URGENCY)" ] && URGENCY="-u critical"
-		$(NOTIFY) $${URGENCY:-} "Error!" "Planning failed: $$(basename $${PWD})"
-	fi
-	exit $$ret
+	terraform plan -out=tfplan $(PLAN_TARGET) | tee plan-output.txt; then
 
 .PHONY: plan-destroy
 plan-destroy: .validate-workspace ## Make a plan to destroy the current configuration
@@ -158,28 +138,12 @@ plan-destroy: .validate-workspace ## Make a plan to destroy the current configur
 
 .PHONY: apply
 apply: $(CAREFUL) ## Apply the changes in `tfplan` (i.e. after running 'make plan').
-	@. $(UTILS)
-	if [ ! -f "tfplan" ]; then
-		log_error "No tfplan exists. Run 'make plan' to generate it and try again."
-		exit 1
-	fi
-	if terraform apply tfplan 2>&1 | tee apply-output.txt; then
-		ret=$$?
-		$(NOTIFY) $(URGENCY) "Done!" "[apply] Your bidding has been done: $$(basename $${PWD})"
-	else
-		ret=$$?
-		[ -n "$(URGENCY)" ] && URGENCY="-u critical"
-		$(NOTIFY) $${URGENCY} "Error!" "Apply failed (code $$ret): $$(basename $${PWD})"
-	fi
-	exit $$ret
+	terraform apply tfplan 2>&1 | tee apply-output.txt
 
 .PHONY: .validate-workspace
 .validate-workspace: # Print a big warning if we're on the workspace 'default'
-	@. $(UTILS)
-	if [ "$(TF_WORKSPACE)" = "default" ]; then
-		log_error "Select a non-default workspace. Your current workspace is '$(TF_WORKSPACE)'. Here's a list:"
-		terraform workspace list
-		log_warning "Select one by running 'terraform workspace select <NAME>"
+	@if [ "$(TF_WORKSPACE)" = "default" ]; then
+		echo "Select a non-default workspace. Your current workspace is '$(TF_WORKSPACE)' (list workspaces with 'terraform workspace list')."
 		exit 1
 	fi
 

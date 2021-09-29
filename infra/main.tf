@@ -1,19 +1,6 @@
 locals {
-  tags = {}
   name = "demo"
 }
-
-resource "aws_dynamodb_table" "terraform_locks" {
-  name         = "terraform-state-locks"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-  tags = local.tags
-}
-
 
 resource "aws_key_pair" "demo" {
   key_name   = "demo-aj"
@@ -24,7 +11,6 @@ resource "aws_key_pair" "demo" {
 resource "aws_iam_role" "control_plane" {
   # Allows access to other AWS service resources that are required to operate clusters managed by EKS.
   name = "${local.name}-control-plane"
-  tags = local.tags
 
   assume_role_policy = <<POLICY
 {
@@ -55,7 +41,6 @@ resource "aws_iam_role_policy_attachment" "control_plane_service_policy" {
 # Worker roles
 resource "aws_iam_role" "node" {
   name = "${local.name}-node"
-  tags = local.tags
 
   assume_role_policy = <<POLICY
 {
@@ -100,8 +85,4 @@ resource "aws_iam_instance_profile" "nodes" {
 
 resource "aws_ecr_repository" "queue-watcher" {
   name = "queue-watcher"
-}
-
-resource "aws_ecr_repository" "cruncher" {
-  name = "cruncher"
 }
