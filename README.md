@@ -114,3 +114,18 @@ or:
 export QUEUE_URL=$(terraform -chdir=app output -json | jq -r .queue_url.value)
 aws sqs send-message --queue-url "${QUEUE_URL}" --message-body '{ "target": "goo.gl", "duration": "1"}'
 ```
+
+As more messages are added to the queue, new nodes should be created.
+
+To list nodes:
+
+```
+make nodes-show
+```
+
+To view autoscaling activity:
+
+```
+make asg-list
+make asg-activity ASG=<id from previous command>
+```
