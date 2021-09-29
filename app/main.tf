@@ -229,7 +229,7 @@ resource "kubernetes_service_account" "queue_watcher" {
 
 # Role bindings
 #
-# Note: No role binding needed for cruncher since it doesn't interact with AWS
+# Note: No role binding is needed for `cruncher` since it doesn't interact with AWS or k8s.
 #
 resource "kubernetes_role_binding" "queue_watcher" {
   # Needs to be able to create pods

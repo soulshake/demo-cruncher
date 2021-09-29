@@ -8,6 +8,23 @@ Each job pops a message from the queue, processes it, and deletes it.
 
 If more resources are needed, the cluster autoscaler kicks in to add more nodes.
 
+## Summary of resources defined in this repo
+
+The `./demo-cluster` directory contains the definitions for an EKS cluster, node group, associated IAM roles/policies, etc. This directory need only be instantiated once.
+
+The `./app` directory contains everything needed to run one instantiation of the "app". For example, to create a `staging` and `production` environment, you could run:
+
+```
+terraform workspace new staging
+make plan
+make apply
+terraform workspace new production
+make plan
+make apply
+```
+
+Each Terraform workspace corresponds to a Kubernetes namespace, a dedicated SQS queue and `queue-watcher` deployment, and IAM roles with permissions scoped to these resources.
+
 ## Setup
 
 ### Dependencies
