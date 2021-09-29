@@ -3,8 +3,9 @@
 ### Dependencies
 
 - Terraform
-- aws cli
+- AWS CLI
 - `jq`
+- `make`
 
 To install Terraform:
 
@@ -14,13 +15,21 @@ make deps
 
 ### Set environment variables
 
+Run the following commands to retrieve your account ID and region:
+
+```
+aws sts get-caller-identity
+aws configure get region
+```
+
 Ensure the following environment variables are set:
 
 - `AWS_REGION`
 - `AWS_ACCOUNT_ID`
-- `MAKEFILES=../Makefile` # to be able to run make in subdirectories
+- `MAKEFILES=../Makefile` (to be able to run make in subdirectories)
+- `WORKSPACE=production` (or another value of your choice)
 
-Run `make env` to show the current values of these variables; run `aws sts get-caller-identity` to validate your AWS credentials.
+Run `make env` to show the current values of these variables.
 
 ### Create the cluster
 
@@ -43,7 +52,7 @@ In `./app/`:
 
 ```
 export REGISTRY_SLASH=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-export COLON_TAG=:production
+export COLON_TAG=:${WORKSPACE}
 aws ecr get-login-password | docker login --username AWS --password-stdin ${REGISTRY_SLASH}
 docker-compose build && docker-compose push
 ```
@@ -52,7 +61,7 @@ docker-compose build && docker-compose push
 
 ```
 terraform init
-terraform workspace select production
+terraform workspace new ${WORKSPACE}
 make plan
 make apply
 ```
@@ -63,7 +72,8 @@ Update your kube config:
 
 ```
 aws eks update-kubeconfig --name demo
-kubectl config set-context demo --namespace demo-${WORKSPACE} # WORKSPACE should match the Terraform workspace in ./app
+kubectl config set-context demo --namespace demo-${WORKSPACE}
+# ^ WORKSPACE should match the Terraform workspace in ./app
 ```
 
 Add some messages to the queue (ensure `AWS_REGION` and `AWS_ACCOUNT_ID` are set):
@@ -75,5 +85,5 @@ Add some messages to the queue (ensure `AWS_REGION` and `AWS_ACCOUNT_ID` are set
 or:
 ```
 export QUEUE_URL=$(terraform -chdir=app output -json | jq -r .queue_url.value)
-aws sqs send-message --queue-url https://sqs.eu-central-1.amazonaws.com/731288958074/demo-production --message-body '{ "target": "goo.gl", "duration": "1"}'
+aws sqs send-message --queue-url "${QUEUE_URL}" --message-body '{ "target": "goo.gl", "duration": "1"}'
 ```
