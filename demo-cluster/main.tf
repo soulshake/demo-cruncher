@@ -227,7 +227,7 @@ resource "aws_eks_node_group" "ng" {
 
   scaling_config {
     desired_size = 1
-    max_size     = 4
+    max_size     = 3
     min_size     = 0
   }
 

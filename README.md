@@ -2,7 +2,6 @@
 
 - Terraform
 - aws cli
-- `notify-send` (optional)
 - `terraform-docs` (optional)
 - `direnv` (optional)
 - `jq`
@@ -27,6 +26,8 @@ Configurable:
 - workspace
 - `AWS_REGION`
 
+### Create the AWS resources (IAM roles, policies, ECR repo, etc)
+
 In `./infra`:
 
 ```
@@ -35,6 +36,8 @@ make plan
 make apply
 ```
 
+### Create the cluster
+
 In `./demo-cluster/`:
 
 ```
@@ -42,14 +45,20 @@ make plan
 make apply
 ```
 
+### Build and push queue-watcher image
+
 In `./app/`:
 
 ```
-aws ecr get-login-password | docker login --username AWS --password-stdin 731288958074.dkr.ecr.eu-central-1.amazonaws.com
-export REGISTRY_SLASH=731288958074.dkr.ecr.eu-central-1.amazonaws.com/
+export REGISTRY_SLASH=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+aws ecr get-login-password | docker login --username AWS --password-stdin ${REGISTRY_SLASH}
 export COLON_TAG=:production
 docker-compose build && docker-compose push
 ```
+
+### Instantiate the demo app
+
+### Interact with the demo app
 
 Update your kube config:
 
@@ -61,7 +70,7 @@ kubectl config set-context demo --namespace demo-production
 Add some messages to the queue:
 
 ```
-export QUEUE_URL=https://sqs.eu-central-1.amazonaws.com/731288958074/demo-production
+export QUEUE_URL=https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/demo-production
 ./messages.sh --add 1
 ```
 

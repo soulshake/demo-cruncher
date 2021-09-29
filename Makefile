@@ -78,12 +78,8 @@ deps: /usr/local/bin/terraform
 ###
 
 .PHONY: env
-env: # $(ROOT)/.envrc
-	@. $(UTILS)
-	if [ -z "$${AWS_ACCOUNT_ID:-}" ]; then
-		log_error "Please set AWS_ACCOUNT_ID"
-	fi
-	echo "AWS_ACCOUNT_ID=$${AWS_ACCOUNT_ID:-}"
+env: ## Emit the values of the environment variables we care about
+	@echo "AWS_ACCOUNT_ID=$${AWS_ACCOUNT_ID:-}"
 	echo "AWS_REGION=$${AWS_REGION:-}"
 	echo "MAKEFILES=$${MAKEFILES:-}"
 	echo "QUEUE_URL=$${QUEUE_URL:-}"
@@ -128,7 +124,7 @@ state.tf:
 	fi
 
 tfplan: $(CAREFUL) | state.tf
-	terraform plan -out=tfplan $(PLAN_TARGET) | tee plan-output.txt; then
+	terraform plan -out=tfplan $(PLAN_TARGET) | tee plan-output.txt
 
 .PHONY: plan-destroy
 plan-destroy: .validate-workspace ## Make a plan to destroy the current configuration
@@ -170,12 +166,6 @@ asg-list: ## List autoscaling groups
 ASG ?=
 .PHONY: asg-activity
 asg-activity: ## Show activity for autoscaling group: make asg-activity ASG=<name>
-	@. $(UTILS)
-	log_verbose "Showing autoscaling activity for ASG '$(ASG)'..."
-	if [ -n "$(ASG)" ]; then
-	  aws autoscaling describe-scaling-activities --auto-scaling-group-name $(ASG)
-	else
-	  log_warning "Specify an ASG="
-		log_verbose "Here's a list:"
-		make asg-list
-	fi
+	@[ -z "$(ASG)" ] && echo "Specify an ASG= (view with 'make asg-list')" && exit 1
+	echo "Showing autoscaling activity for ASG '$(ASG)'..."
+	aws autoscaling describe-scaling-activities --auto-scaling-group-name $(ASG)

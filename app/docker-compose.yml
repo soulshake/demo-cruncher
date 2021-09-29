@@ -7,8 +7,7 @@ services:
     build:
       args:
         BUILDKIT_INLINE_CACHE: 1
-        AWS_REGION:
       cache_from:
-        - ${REGISTRY_SLASH}cruncher${COLON_TAG}
+        - ${REGISTRY_SLASH}queue-watcher${COLON_TAG}
       context: ./queue-watcher
     image: ${REGISTRY_SLASH}queue-watcher${COLON_TAG}

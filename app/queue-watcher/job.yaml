@@ -41,15 +41,13 @@ spec:
           fi
           # Save message metadata in our /state volume which is shared across containers.
           echo "${message}" | jq -r '.Messages[0]' | tee /state/message.json
-          cat /state/message.json | jq -r '.MessageId' | tee /state/MESSAGE_ID
           cat /state/message.json | jq -r '.ReceiptHandle' | tee /state/RECEIPT_ID
           cat /state/message.json | jq -r '.Body' | jq . | tee /state/body.json
           cat /state/body.json | jq -r '.duration' | tee /state/DURATION
           cat /state/body.json | jq -r '.target' | tee /state/TARGET
 
-          # /src/crunch.sh fetch-message
-          # Note: These are replaced via envsubst
         env:
+          # Note: These are replaced via envsubst
         - name: AWS_REGION
           value: "${AWS_REGION}"
         - name: QUEUE_URL
@@ -86,6 +84,7 @@ spec:
           ping -w "${duration}" "${target}"
           set -x
           aws sqs delete-message --queue-url "${QUEUE_URL}" --receipt-handle "$(cat /state/RECEIPT_ID)"
+          echo "All done!"
         resources:
           requests:
             cpu: "100m"

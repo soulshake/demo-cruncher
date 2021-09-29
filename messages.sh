@@ -1,21 +1,12 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC1091
-. "$(git rev-parse --show-toplevel)/bin/utils.sh"
 
 set -euo pipefail
 SELECTOR="${SELECTOR:-app=demo-pipeline}"
-
-need_queue_url() {
-    if [ -z "${QUEUE_URL:-}" ]; then
-        echo "Please set the QUEUE_URL environment variable. Try running:"
-        echo "terraform -chdir=app output -json | jq -r .queue_url.value"
-        return 1
-    fi
-}
+WORKSPACE=${WORKSPACE:-production}
+QUEUE_URL=https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/demo-${WORKSPACE}
 
 add_messages() {
     local count target duration msg
-    need_queue_url || return 1
     count=${1:-1}
     target=${TARGET:-goo.gl}
     duration=${DURATION:-30}
@@ -33,7 +24,6 @@ add_messages() {
 }
 
 show_queue() {
-    need_queue_url || return 1
     (
         set -x
         aws sqs get-queue-attributes --queue-url "${QUEUE_URL}" --attribute-names QueueArn ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
@@ -47,34 +37,27 @@ show_jobs() {
 }
 
 purge_queue() {
-    need_queue_url || return 1
-    log_warning "Purging queue ${QUEUE_URL}..."
-    show_queue | grep QueueArn -A3
-    # shellcheck disable=SC2119
-    if confirm; then
-        (
-            set -x
-            aws sqs purge-queue --queue-url "${QUEUE_URL}"
-        )
-        log_success "Queue purged"
-    fi
+    echo "Purging queue ${QUEUE_URL}..."
+    show_queue
+    (
+        set -x
+        aws sqs purge-queue --queue-url "${QUEUE_URL}"
+    )
+    echo "Queue purged"
 }
 
 purge_jobs() {
-    log_warning "Purging all jobs matching selector: ${SELECTOR} ..."
+    echo "Purging all jobs matching selector: ${SELECTOR} ..."
     show_jobs
-    # shellcheck disable=SC2119
-    if confirm; then
-        kubectl delete jobs --selector="${SELECTOR}"
-        log_success "Jobs purged."
-    fi
+    kubectl delete jobs --selector="${SELECTOR}"
+    echo "Jobs purged."
 }
 
 usage() {
     echo "Usage:"
     echo -e "-h, --help\t\t show usage"
     echo -e "-a, --add <count>\t generate and enqueue <count> messages (\$QUEUE_URL, \$TARGET, \$DURATION)"
-    echo -e "-p, --purge\t\t purge jobs and queue (\$QUEUE_URL, \$SELECTOR)"
+    echo -e "-p, --purge\t\t purge queue and jobs (\$QUEUE_URL, \$SELECTOR)"
     echo -e "-s, --show\t\t show queue attributes (\$QUEUE_URL)"
 }
 

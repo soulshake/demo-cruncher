@@ -25,3 +25,4 @@ RUN echo "KUBECTL_VERSION: ${KUBECTL_VERSION}" \
 
 COPY . /src
 WORKDIR /src
+ENTRYPOINT ["/src/watch.sh"]
