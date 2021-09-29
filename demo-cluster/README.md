@@ -1,3 +1,5 @@
+This directory contains the definitions for an EKS cluster, node group, associated IAM roles/policies, etc. This directory need only be instantiated once.
+
 ## Requirements
 
 | Name | Version |
