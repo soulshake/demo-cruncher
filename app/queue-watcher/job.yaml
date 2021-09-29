@@ -33,12 +33,12 @@ spec:
         - -c
         - |
           set -euo pipefail
-          yum install -y jq
           message=$(aws sqs receive-message --max-number-of-messages 1 --attribute-names All --wait-time-seconds 10 --queue-url "${QUEUE_URL}")
           if [ -z "${message}" ]; then
             echo "No message was received. Bailing."
             exit 1
           fi
+          yum install -y jq
           # Save message metadata in our /state volume which is shared across containers.
           echo "${message}" | jq -r '.Messages[0]' | tee /state/message.json
           cat /state/message.json | jq -r '.ReceiptHandle' | tee /state/RECEIPT_ID

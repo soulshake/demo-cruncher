@@ -23,8 +23,6 @@ data "aws_region" "current" {}
 ### aws provider
 ###
 provider "aws" {
-  region              = "eu-central-1"
-  allowed_account_ids = [731288958074]
   default_tags {
     tags = {
       repo_dir  = basename(abspath(path.root))
@@ -32,7 +30,6 @@ provider "aws" {
       workspace = terraform.workspace
     }
   }
-  # no assume_role here; credentials are set via environment variables to avoid Terraform+MFA problems
 }
 
 ###

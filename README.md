@@ -1,9 +1,9 @@
-## Dependencies
+## Setup
+
+### Dependencies
 
 - Terraform
 - aws cli
-- `terraform-docs` (optional)
-- `direnv` (optional)
 - `jq`
 
 To install Terraform:
@@ -12,51 +12,48 @@ To install Terraform:
 make deps
 ```
 
-To install autocompletion:
+### Set environment variables
 
-```
-terraform -install-autocomplete
-```
+Ensure the following environment variables are set:
 
-## Other stuff
-
-Configurable:
-
-- `TF_VAR_key_pair_name`
-- workspace
 - `AWS_REGION`
-
-### Create the AWS resources (IAM roles, policies, ECR repo, etc)
-
-In `./infra`:
-
-```
-terraform init
-make plan
-make apply
-```
+- `AWS_ACCOUNT_ID`
+- `MAKEFILES=../Makefile` # to be able to run make in subdirectories
 
 ### Create the cluster
 
 In `./demo-cluster/`:
 
 ```
+terraform init
+terraform workspace select demo-cluster
 make plan
 make apply
 ```
 
-### Build and push queue-watcher image
+To be able to connect to nodes, set `TF_VAR_public_key` to the desired public key (in OpenSSH format), then plan/apply.
+
+### Instantiate the demo app
 
 In `./app/`:
 
+#### Build and push queue-watcher image
+
 ```
 export REGISTRY_SLASH=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-aws ecr get-login-password | docker login --username AWS --password-stdin ${REGISTRY_SLASH}
 export COLON_TAG=:production
+aws ecr get-login-password | docker login --username AWS --password-stdin ${REGISTRY_SLASH}
 docker-compose build && docker-compose push
 ```
 
-### Instantiate the demo app
+#### Deploy
+
+```
+terraform init
+terraform workspace select production
+make plan
+make apply
+```
 
 ### Interact with the demo app
 

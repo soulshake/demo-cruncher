@@ -70,7 +70,6 @@ resource "kubernetes_deployment" "queue_watcher" {
         container {
           image             = "${local.id}.dkr.ecr.${local.region}.amazonaws.com/queue-watcher:${terraform.workspace}"
           image_pull_policy = "Always"
-          args              = ["watch"]
           name              = "queue-watcher"
           env {
             name  = "IMAGE_TAG"
@@ -168,7 +167,6 @@ data "aws_iam_policy_document" "cruncher" {
     ]
   }
   statement {
-    # Access to the resource https://sqs.eu-central-1.amazonaws.com/ is denied.
     sid = "CanPopMessages"
     actions = [
       "sqs:ChangeMessageVisibility",
@@ -183,14 +181,6 @@ data "aws_iam_policy_document" "cruncher" {
 }
 
 data "aws_iam_policy_document" "queue_watcher" {
-  # Allow SQS
-  # statement {
-  # # Unsure if this one is needed
-  # sid       = "CanListQueues"
-  # actions   = ["sqs:ListQueues"]
-  # resources = ["*"]
-  # }
-
   statement {
     sid = "CanDescribeQueue"
     actions = [

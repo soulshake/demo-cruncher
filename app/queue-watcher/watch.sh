@@ -54,7 +54,7 @@ main() {
     log_verbose "$(get_queue_attributes)" # informational; shows all queue attributes
     while true; do
         log_debug "Status at beginning of loop:"
-        log_debug "$(get_queue_attributes ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible | jq .Attributes)" # informational
+        log_verbose "$(get_queue_attributes ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible | jq .Attributes)" # informational
         mc="$(get_message_count)"
         pc="$(get_pending_count)"
         to_create=$((mc - pc))
@@ -62,11 +62,12 @@ main() {
             log_verbose "There at least as many pending jobs as messages in the queue (${pc} >= ${mc}). Taking a nap."
             sleep 3 && continue
         fi
-        log_success "${mc} messages in the queue; ${pc} pending pods. Creating ${to_create} job(s), within the limits of MAX_PENDING (${MAX_PENDING})."
+        log_success "${mc} message(s) in the queue; ${pc} pending pod(s). Creating ${to_create} job(s), within the limits of MAX_PENDING (${MAX_PENDING})."
         while [ "${to_create}" -ge 1 ]; do
             block_if_too_many_pending
             if kickoff_job; then
                 log_success "Kicked off job"
+                sleep 5 # Allow a few seconds for get-queue-attributes to reflect reality?
             else
                 log_error "Couldn't kickoff job"
                 sleep 20
