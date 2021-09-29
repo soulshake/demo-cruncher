@@ -9,9 +9,6 @@ MAKEFLAGS += --no-builtin-rules
 # Don't delete .PRECIOUS targets when planning fails
 .PRECIOUS: plan-output.txt
 
-# Include all .mk files in repo root
-include $(wildcard $(shell git rev-parse --show-toplevel)/*.mk)
-
 # Directories
 ROOT := $(shell git rev-parse --show-toplevel)
 UTILS = $(ROOT)/bin/utils.sh
@@ -44,29 +41,6 @@ help: ## Displays help for each commented make recipe
 .PHONY: whoami
 whoami: ## Runs 'aws sts get-caller-identity'
 	aws sts get-caller-identity
-
-###
-### Deps
-###
-
-OS_NAME := $(shell uname -s | tr A-Z a-z)
-ARCH = $(shell uname -m)
-ifeq ($(ARCH),x86_64)
-  ARCH_NAME = amd64
-else
-  ARCH_NAME = $(ARCH)
-endif
-TERRAFORM_VERSION = 1.0.7
-TERRAFORM_SOURCE := "https://releases.hashicorp.com/terraform/$(TERRAFORM_VERSION)/terraform_$(TERRAFORM_VERSION)_$(OS_NAME)_$(ARCH_NAME).zip"
-
-.PHONY: deps
-deps: /usr/local/bin/terraform
-
-/usr/local/bin/terraform:
-	cd /tmp
-	curl -sLO $(TERRAFORM_SOURCE)
-	sudo unzip "$$(basename $(TERRAFORM_SOURCE))" -d /usr/local/bin/
-	/usr/local/bin/terraform -version
 
 ###
 ### Environment
@@ -164,3 +138,26 @@ asg-activity: ## Show activity for autoscaling group: make asg-activity ASG=<nam
 	@[ -z "$(ASG)" ] && echo "Specify an ASG= (view with 'make asg-list')" && exit 1
 	echo "Showing autoscaling activity for ASG '$(ASG)'..."
 	aws autoscaling describe-scaling-activities --auto-scaling-group-name $(ASG)
+
+###
+### Deps
+###
+
+OS_NAME := $(shell uname -s | tr A-Z a-z)
+ARCH = $(shell uname -m)
+ifeq ($(ARCH),x86_64)
+  ARCH_NAME = amd64
+else
+  ARCH_NAME = $(ARCH)
+endif
+TERRAFORM_VERSION = 1.0.7
+TERRAFORM_SOURCE := "https://releases.hashicorp.com/terraform/$(TERRAFORM_VERSION)/terraform_$(TERRAFORM_VERSION)_$(OS_NAME)_$(ARCH_NAME).zip"
+
+.PHONY: deps
+deps: /usr/local/bin/terraform
+
+/usr/local/bin/terraform:
+	cd /tmp
+	curl -sLO $(TERRAFORM_SOURCE)
+	sudo unzip "$$(basename $(TERRAFORM_SOURCE))" -d /usr/local/bin/
+	/usr/local/bin/terraform -version
