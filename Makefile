@@ -59,9 +59,9 @@ hello: ## Shows very basic options
 	echo -e "You are hacking on $${green}$${underline}$${bold}$(SERVICE_NAME)$${reset} in workspace $${underline}$${bold}$(TF_WORKSPACE)$${reset}"
 	echo
 	echo "Would you like to:"
-	echo "	make plan - plan your demise"
+	echo "	make plan	- plan your demise"
 	echo "	make apply	- dance with the devil in the pale moonlight"
-	echo "	make help - show all commands"
+	echo "	make help	- show all commands"
 
 .PHONY: help
 help: ## Displays help for each commented make recipe
@@ -94,37 +94,14 @@ help: ## Displays help for each commented make recipe
 .PHONY: docs
 docs:
 	@. $(UTILS)
-	for mod in $(shell find ./modules -mindepth 1 -maxdepth 1 -type d); do
-		log_verbose "terraform-docs markdown $${mod} > $${mod}/README.md"
-		terraform-docs markdown $${mod} > $${mod}/README.md
+	for dir in app demo-cluster infra; do
+		log_verbose "terraform-docs markdown $${dir} > $${dir}/README.md"
+		terraform-docs markdown $${dir} > $${dir}/README.md
 	done
 
-.PHONY: .need-port-80
-.need-port-80:
-	@. $(UTILS)
-	if sudo ss -tulpn | grep -w ':80'; then
-		log_warning "Port 80 seems occupied"
-	fi
-
-.PHONY: .only-on-ec2
-.only-on-ec2:
-	@. $(UTILS)
-	result=$$(curl -s 169.254.169.254/latest/meta-data/identity-credentials/ec2/info) || true # otherwise fails rather silently
-	if [ -z "$${result}" ] || ! echo $${result} | jq -r .Code 2>/dev/null; then
-		log_error "Missing or unparsable response from metadata endpoint. Are you running on ec2?"
-		log_notice "Here's the response, if we got one:"
-		log $${result}
-		exit 1
-	fi
-
-.PHONY: whoami-aws
-whoami-aws: ## Runs 'aws sts get-caller-identity'
-	@. $(UTILS)
-	log_notice "AWS details:"
-	echo "Running on instance: $$(curl -s 169.254.169.254/latest/meta-data/instance-id)"
-	echo "Instance profile: $$(curl -s 169.254.169.254/latest/meta-data/iam/info | jq -r .InstanceProfileArn | cut -d '/' -f2)"
+.PHONY: whoami
+whoami: ## Runs 'aws sts get-caller-identity'
 	aws sts get-caller-identity
-	echo
 
 .PHONY: .validate-workspace
 .validate-workspace: # Print a big warning if we're on the workspace 'default'

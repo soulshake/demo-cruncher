@@ -10,7 +10,7 @@ shopt -s inherit_errexit
 . "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
 
 # Never create more than MAX_PENDING jobs.
-MAX_PENDING=1
+MAX_PENDING=10 # TODO: parameterize
 
 kickoff_job() {
     log_verbose "Kicking off job..."
