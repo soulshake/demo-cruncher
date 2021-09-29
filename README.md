@@ -1,3 +1,24 @@
+## Dependencies
+
+- Terraform
+- aws cli
+- `notify-send` (optional)
+- `terraform-docs` (optional)
+
+To install Terraform:
+
+```
+make deps
+```
+
+To install autocompletion:
+
+```
+terraform -install-autocomplete
+```
+
+## Other stuff
+
 Configurable:
 
 - `TF_VAR_key_pair_name`
@@ -7,6 +28,7 @@ Configurable:
 In `./infra`:
 
 ```
+terraform init
 make plan
 make apply
 ```
