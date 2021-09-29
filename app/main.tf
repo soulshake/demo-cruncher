@@ -115,7 +115,6 @@ resource "aws_iam_role" "queue_watcher" {
 
 data "aws_iam_policy_document" "assume_role_with_oidc" {
   # Allow cluster to authenticate roles via its OIDC provider.
-  # Tip: use local references within policy documents to avoid '(known after apply)' when planning.
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
     principals {

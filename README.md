@@ -1,3 +1,13 @@
+# Cruncher
+
+This is a simple demo app to demonstrate cluster autoscaling on EKS.
+
+A `queue-watcher` deployment is created, which monitors an SQS queue. When messages appear in the queue, the deployment creates enough Kubernetes jobs to handle each message.
+
+Each job pops a message from the queue, processes it, and deletes it.
+
+If more resources are needed, the cluster autoscaler kicks in to add more nodes.
+
 ## Setup
 
 ### Dependencies
