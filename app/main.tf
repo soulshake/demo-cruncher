@@ -1,3 +1,20 @@
+/*
+ * This directory contains everything needed to run one instantiation of the demo app.
+ * Each Terraform workspace corresponds to a Kubernetes namespace, a dedicated SQS queue and `queue-watcher` deployment, and IAM roles with permissions scoped to these resources.
+ * For example, to create a `staging` and `production` environment, you could run:
+ *
+ * ```
+ * terraform workspace new staging
+ * make plan
+ * make apply
+ *
+ * terraform workspace new production
+ * make plan
+ * make apply
+ * ```
+ *
+ */
+
 variable "max_pending" {
   default     = 10
   description = "Maximum number of pending pods to tolerate before we stop creating new jobs."
