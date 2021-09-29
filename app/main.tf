@@ -150,9 +150,8 @@ resource "aws_iam_policy" "queue_watcher" {
 }
 
 
-data "aws_ecr_repository" "repos" {
-  for_each = toset(["cruncher", "queue-watcher"])
-  name     = each.value
+data "aws_ecr_repository" "queue_watcher" {
+  name = "queue-watcher"
 }
 
 data "aws_iam_policy_document" "cruncher" {
@@ -163,7 +162,7 @@ data "aws_iam_policy_document" "cruncher" {
       "ecr:DescribeRepositories",
     ]
     resources = [
-      for repo in data.aws_ecr_repository.repos : repo.arn
+      data.aws_ecr_repository.queue_watcher.arn
     ]
   }
   statement {
@@ -231,7 +230,7 @@ resource "kubernetes_service_account" "queue_watcher" {
 
 # Role bindings
 #
-# Note: No role binding needed for cruncher
+# Note: No role binding needed for cruncher since it doesn't interact with AWS
 #
 resource "kubernetes_role_binding" "queue_watcher" {
   # Needs to be able to create pods

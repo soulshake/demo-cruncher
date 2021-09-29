@@ -58,11 +58,6 @@ else
 endif
 TERRAFORM_VERSION = 1.0.7
 TERRAFORM_SOURCE := "https://releases.hashicorp.com/terraform/$(TERRAFORM_VERSION)/terraform_$(TERRAFORM_VERSION)_$(OS_NAME)_$(ARCH_NAME).zip"
-.PHONY: show-install
-show-install:
-	@echo cd /tmp
-	echo curl -sLO $(TERRAFORM_SOURCE)
-	echo sudo unzip "$$(basename $(TERRAFORM_SOURCE))" -d /usr/local/bin/
 
 .PHONY: deps
 deps: /usr/local/bin/terraform
@@ -82,7 +77,13 @@ env: ## Emit the values of the environment variables we care about
 	@echo "AWS_ACCOUNT_ID=$${AWS_ACCOUNT_ID:-}"
 	echo "AWS_REGION=$${AWS_REGION:-}"
 	echo "MAKEFILES=$${MAKEFILES:-}"
-	echo "QUEUE_URL=$${QUEUE_URL:-}"
+	echo
+	echo "# Needed for running messages.sh; must match the Terraform workspace in ./app:"
+	echo "WORKSPACE=$${WORKSPACE:-}"
+	echo
+	echo "# Needed to run 'docker-compose build' in ./app:"
+	echo "REGISTRY_SLASH=$${REGISTRY_SLASH:-}"
+	echo "COLON_TAG=$${COLON_TAG:-}" # Should match the value of WORKSPACE above
 
 ###
 ### Terraform
@@ -92,20 +93,14 @@ TF_MANIFEST_FILES := $(shell find . -maxdepth 1 -type f -name '*.tf')
 # The presence of .tf or .tfvars files indicates that make should include
 # terraform-specific targets.
 ifneq ($(TF_MANIFEST_FILES), )
-  TF_PLUGIN_CACHE_DIR = $(ROOT)/.user/.terraform.d/plugin-cache
   TF_CONFIG_DIR = .terraform
-  # TF_WORKSPACE_FILE = .terraform/environment
-  # TF_STATE_FILE = .terraform/terraform.tfstate
 else
-  # TF_WORKSPACE_FILE =
-  # TF_STATE_FILE =
   TF_CONFIG_DIR =
 endif
 
 # Variables
 TF_WORKSPACE = $(shell terraform workspace show)
 CAREFUL ?= .validate-workspace
-
 
 # .PHONY: init
 # init: | $(TF_CONFIG_DIR)
@@ -146,7 +141,7 @@ apply: $(CAREFUL) ## Apply the changes in `tfplan` (i.e. after running 'make pla
 .PHONY: docs
 docs:
 	@. $(UTILS)
-	for dir in app demo-cluster infra; do
+	for dir in app demo-cluster; do
 		log_verbose "terraform-docs markdown $${dir} > $${dir}/README.md"
 		terraform-docs markdown $${dir} > $${dir}/README.md
 	done

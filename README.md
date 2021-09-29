@@ -20,6 +20,8 @@ Ensure the following environment variables are set:
 - `AWS_ACCOUNT_ID`
 - `MAKEFILES=../Makefile` # to be able to run make in subdirectories
 
+Run `make env` to show the current values of these variables; run `aws sts get-caller-identity` to validate your AWS credentials.
+
 ### Create the cluster
 
 In `./demo-cluster/`:
@@ -61,13 +63,12 @@ Update your kube config:
 
 ```
 aws eks update-kubeconfig --name demo
-kubectl config set-context demo --namespace demo-production
+kubectl config set-context demo --namespace demo-${WORKSPACE} # WORKSPACE should match the Terraform workspace in ./app
 ```
 
-Add some messages to the queue:
+Add some messages to the queue (ensure `AWS_REGION` and `AWS_ACCOUNT_ID` are set):
 
 ```
-export QUEUE_URL=https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/demo-production
 ./messages.sh --add 1
 ```
 

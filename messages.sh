@@ -2,7 +2,7 @@
 
 set -euo pipefail
 SELECTOR="${SELECTOR:-app=demo-pipeline}"
-WORKSPACE=${WORKSPACE:-production}
+WORKSPACE=${WORKSPACE?Please set the WORKSPACE environment variable (should match the Terraform workspace in ./app)}
 QUEUE_URL=https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/demo-${WORKSPACE}
 
 add_messages() {
@@ -32,7 +32,10 @@ show_queue() {
 
 show_jobs() {
     echo
-    kubectl get jobs --selector="${SELECTOR}"
+    (
+        set -x
+        kubectl get jobs --selector="${SELECTOR}"
+    )
     echo
 }
 
