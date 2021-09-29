@@ -1,9 +1,14 @@
+variable "max_pending" {
+  default     = 10
+  description = "Maximum number of pending pods to tolerate before we stop creating new jobs."
+  type        = number
+}
+
 locals {
   id          = data.aws_caller_identity.current.account_id
   namespace   = "demo-${terraform.workspace}"
   oidc_issuer = replace(data.aws_eks_cluster.demo.identity[0].oidc[0].issuer, "https://", "")
   region      = data.aws_region.current.name
-  tags        = {} # additional tags to be added to AWS resources
 
   labels = {
     workspace = terraform.workspace
@@ -16,20 +21,9 @@ locals {
   })
 }
 
-###
-### Queues
-###
-
-# Primary DEEPGEN queue (for this ${terraform.workspace} environment)
+# SQS queue
 resource "aws_sqs_queue" "queue" {
   name = local.namespace
-  tags = local.tags
-  # content_based_deduplication = true
-  # deduplication_scope         = "messageGroup" # must be messageGroup if throughput limit is set to 'perMessageGroupId'
-  # fifo_queue                  = true
-  # fifo_throughput_limit       = "perMessageGroupId" # this allows parallel processing because each sample has a unique message group ID
-  # message_retention_seconds   = 1209600             # 14 days (max)
-  # visibility_timeout_seconds  = 300
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.deadletter.arn
@@ -38,12 +32,9 @@ resource "aws_sqs_queue" "queue" {
 }
 resource "aws_sqs_queue" "deadletter" {
   name = "${local.namespace}-deadletter"
-  tags = local.tags
 }
 
-###
-### Kubernetes resources
-###
+# Kubernetes resources
 resource "kubernetes_namespace" "ns" {
   metadata {
     name = local.namespace
@@ -86,6 +77,10 @@ resource "kubernetes_deployment" "queue_watcher" {
             value = terraform.workspace
           }
           env {
+            name  = "MAX_PENDING"
+            value = var.max_pending
+          }
+          env {
             name  = "QUEUE_URL"
             value = aws_sqs_queue.queue.url
           }
@@ -100,9 +95,6 @@ resource "kubernetes_deployment" "queue_watcher" {
             }
           }
         }
-        # node_selector = {
-        # role = "queue-watcher"
-        # }
       }
     }
   }
@@ -114,16 +106,12 @@ resource "aws_iam_role" "cruncher" {
   name               = "demo-cruncher-${terraform.workspace}"
   description        = "cruncher role for ${terraform.workspace}"
   assume_role_policy = trimspace(data.aws_iam_policy_document.assume_role_with_oidc.json)
-  tags               = local.tags
-  # max_session_duration = 43200
 }
 
 resource "aws_iam_role" "queue_watcher" {
   name               = "demo-queue-watcher-${terraform.workspace}"
   description        = "queue-watcher role for ${terraform.workspace}"
   assume_role_policy = trimspace(data.aws_iam_policy_document.assume_role_with_oidc.json)
-  tags               = local.tags
-  # max_session_duration = 43200
 }
 
 data "aws_iam_policy_document" "assume_role_with_oidc" {
@@ -154,14 +142,18 @@ resource "aws_iam_policy" "cruncher" {
   name        = "${aws_iam_role.cruncher.name}-policy" # role name already includes workspace
   description = "Allows access to resources needed by ${aws_iam_role.cruncher.name} for the demo pipeline."
   policy      = data.aws_iam_policy_document.cruncher.json
-  tags        = local.tags
 }
 
 resource "aws_iam_policy" "queue_watcher" {
   name        = "${aws_iam_role.queue_watcher.name}-policy"
   description = "Allows access to resources needed by ${aws_iam_role.queue_watcher.name} for the demo pipeline."
   policy      = data.aws_iam_policy_document.queue_watcher.json
-  tags        = local.tags
+}
+
+
+data "aws_ecr_repository" "repos" {
+  for_each = toset(["cruncher", "queue-watcher"])
+  name     = each.value
 }
 
 data "aws_iam_policy_document" "cruncher" {
@@ -172,9 +164,8 @@ data "aws_iam_policy_document" "cruncher" {
       "ecr:DescribeRepositories",
     ]
     resources = [
-      "*",
+      for repo in data.aws_ecr_repository.repos : repo.arn
     ]
-    # Can add conditions here to restrict scope to resources created in this workspace
   }
   statement {
     # Access to the resource https://sqs.eu-central-1.amazonaws.com/ is denied.
@@ -192,45 +183,22 @@ data "aws_iam_policy_document" "cruncher" {
 }
 
 data "aws_iam_policy_document" "queue_watcher" {
-  statement {
-    sid = "CanReadEcr"
-    actions = [
-      "ecr:Nothing",
-      # "ecr:BatchCheckLayerAvailability",
-      # "ecr:BatchGetImage",
-      # "ecr:DescribeImageScanFindings",
-      # "ecr:DescribeImages",
-      # "ecr:DescribeRepositories",
-      # "ecr:GetDownloadUrlForLayer",
-      # "ecr:GetLifecyclePolicy",
-      # "ecr:GetLifecyclePolicyPreview",
-      # "ecr:GetRepositoryPolicy",
-      # "ecr:ListImages",
-      # "ecr:ListTagsForResource",
-    ]
-    resources = [
-      "*",
-    ]
-  }
-
   # Allow SQS
-  statement {
-    # Unsure if this one is needed
-    sid       = "CanListQueues"
-    actions   = ["sqs:ListQueues"]
-    resources = ["*"]
-  }
+  # statement {
+  # # Unsure if this one is needed
+  # sid       = "CanListQueues"
+  # actions   = ["sqs:ListQueues"]
+  # resources = ["*"]
+  # }
 
   statement {
     sid = "CanDescribeQueue"
     actions = [
       "sqs:GetQueueAttributes",
-      # "sqs:*",
     ]
     resources = [
       aws_sqs_queue.queue.arn,
     ]
-    # Can add conditions here to restrict scope to resources created in this workspace
   }
 }
 
@@ -301,4 +269,10 @@ resource "kubernetes_role_binding" "queue_watcher" {
     namespace = kubernetes_namespace.ns.metadata.0.name
   }
   provider = kubernetes.demo
+}
+
+# Outputs
+output "queue_url" {
+  description = "URL of the created SQS queue."
+  value       = aws_sqs_queue.queue.url
 }

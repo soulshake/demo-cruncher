@@ -10,12 +10,13 @@ shopt -s inherit_errexit
 . "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
 
 # Never create more than MAX_PENDING jobs.
-MAX_PENDING=10 # TODO: parameterize
+MAX_PENDING=${MAX_PENDING:-5}
+: "${AWS_REGION?Please set the AWS_REGION environment variable.}"
 
 kickoff_job() {
     log_verbose "Kicking off job..."
     # shellcheck disable=SC2016
-    envsubst '${QUEUE_URL},${WORKSPACE}' </src/job.yaml | kubectl create -f -
+    envsubst '${AWS_REGION},${QUEUE_URL},${WORKSPACE}' </src/job.yaml | kubectl create -f -
 }
 
 get_pending_count() {
@@ -33,16 +34,16 @@ get_message_count() {
     get_queue_attributes ApproximateNumberOfMessages | jq -r .Attributes.ApproximateNumberOfMessages
 }
 
-block_if_pending() {
+block_if_too_many_pending() {
     local pending_jobs
 
     # shellcheck disable=SC2086
     pending_jobs="$(get_pending_count)"
-    while [ "${pending_jobs}" -gt "${MAX_PENDING}" ]; do
+    while [ "${pending_jobs}" -ge "${MAX_PENDING}" ]; do
         # Block while there's at least ${MAX_PENDING} pods in Pending status.
         # Note: this may cause scale-up to be slower than it could be, depending on the value of MAX_PENDING and how many nodes can be added at once.
-        log_warning "There are ${pending_jobs} pending jobs, which is more than the MAX_PENDING value (${MAX_PENDING}). Sleeping instead of polling the queue."
-        sleep 10
+        log_warning "There are ${pending_jobs} pending jobs, which is at least as many as the MAX_PENDING value (${MAX_PENDING}). Sleeping instead of polling the queue."
+        sleep 5
         pending_jobs="$(get_pending_count)"
     done
 }
@@ -63,7 +64,7 @@ main() {
         fi
         log_success "${mc} messages in the queue; ${pc} pending pods. Creating ${to_create} job(s), within the limits of MAX_PENDING (${MAX_PENDING})."
         while [ "${to_create}" -ge 1 ]; do
-            block_if_pending
+            block_if_too_many_pending
             if kickoff_job; then
                 log_success "Kicked off job"
                 sleep 5

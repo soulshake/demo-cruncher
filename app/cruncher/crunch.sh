@@ -22,10 +22,10 @@ fetch_message() {
         msg_count="$(aws sqs get-queue-attributes --queue-url "${QUEUE_URL}" --attribute-names ApproximateNumberOfMessages | jq -r '.Attributes.ApproximateNumberOfMessages')"
         if [ "${msg_count}" -eq 0 ]; then
             log_warning "There do not appear to be any messages in the queue. Exiting."
-            exit
+            exit 1
         elif [ "${n}" -ge "${max_tries}" ]; then
             log_warning "There seem to be ${msg_count} in the queue, but could not get one after ${n} tries. Exiting."
-            exit
+            exit 1
         fi
         log_notice "There are ${msg_count} in the queue. Not sure why we didn't get one. Will try again shortly. (Attempt ${n}/${max_tries})"
         sleep 5

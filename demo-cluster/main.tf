@@ -215,7 +215,11 @@ resource "aws_eks_node_group" "ng" {
   node_role_arn   = one(data.aws_iam_role.node[*].arn)
   subnet_ids      = [each.value.id]
 
-  labels = local.labels
+  labels = merge(local.labels, {
+    spot   = true
+    az     = each.value.availability_zone
+    region = local.region
+  })
 
   remote_access {
     ec2_ssh_key = var.key_pair_name
@@ -223,7 +227,7 @@ resource "aws_eks_node_group" "ng" {
 
   scaling_config {
     desired_size = 1
-    max_size     = 3
+    max_size     = 5
     min_size     = 0
   }
 

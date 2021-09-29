@@ -55,6 +55,10 @@ help: ## Displays help for each commented make recipe
 whoami: ## Runs 'aws sts get-caller-identity'
 	aws sts get-caller-identity
 
+###
+### Deps
+###
+
 OS_NAME := $(shell uname -s | tr A-Z a-z)
 ARCH = $(shell uname -m)
 ifeq ($(ARCH),x86_64)
@@ -78,6 +82,21 @@ deps: /usr/local/bin/terraform
 	curl -sLO $(TERRAFORM_SOURCE)
 	sudo unzip "$$(basename $(TERRAFORM_SOURCE))" -d /usr/local/bin/
 	/usr/local/bin/terraform -version
+
+###
+### Environment
+###
+
+.PHONY: env
+env: # $(ROOT)/.envrc
+	@. $(UTILS)
+	if [ -z "$${AWS_ACCOUNT_ID:-}" ]; then
+		log_error "Please set AWS_ACCOUNT_ID"
+	fi
+	echo "AWS_ACCOUNT_ID=$${AWS_ACCOUNT_ID:-}"
+	echo "AWS_REGION=$${AWS_REGION:-}"
+	echo "MAKEFILES=$${MAKEFILES:-}"
+	echo "QUEUE_URL=$${QUEUE_URL:-}"
 
 ###
 ### Terraform
