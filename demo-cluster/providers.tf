@@ -31,8 +31,6 @@ output "whoami" {
 ### aws provider
 ###
 provider "aws" {
-  region              = "eu-central-1"
-  allowed_account_ids = [731288958074]
   default_tags {
     tags = {
       cluster   = "demo"

@@ -1,49 +1,40 @@
-variable "key_pair_name" {
-  description = "Name of the EC2 key pair to use for node access via SSH."
-  default     = "demo-aj"
-  type        = string
+variable "public_key" {
+  default     = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKNEtKIF8/e84xCQJ9ay0XF0FWtpDiixqwTwlvvMxihv6zO7DgxFxmLSb1l621U0mKsRu7O5GRqPnUfv2ppEypnP/ifgxS9Ffc/AxbwtLdcjlZ3y3gCC/lvUs7pbw/zJTNFS1lC5e5xrzpCXiGmG14LtTAC2Y+BnFedk4xAIL1T1BiEJfl6+l8JY4gk6yKhmLcExOFvlHnVZupxYYriuK3XmvKN/6ndj5fc3IrGtQEoQPXZi9kBbtQB9qluFKHcP3Xv6EJwc1DDFXSxxK6hjOYq4T4cHQEgBYB4HMrYD/00BXHWJvcCxdy025DrHoyUEKYYOl41U2ydLXwBN/WxFPN aj@soulshake.net"
+  description = "Public key to provision on nodes."
 }
+
 locals {
   availability_zones = ["eu-central-1a", "eu-central-1b", "eu-central-1c"]
   aws                = 1
   id                 = data.aws_caller_identity.current.account_id
-  labels             = local.tags
   name               = "demo"
   region             = data.aws_region.current.name
-  tags               = {}
 }
 
 ###
 ### Cluster
 ###
 
-data "aws_iam_role" "control_plane" {
-  name = "demo-control-plane"
-}
-
-data "aws_iam_role" "node" {
-  name = "demo-node"
-}
-
 resource "aws_eks_cluster" "current" {
   name                      = "demo"
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
-  role_arn                  = one(data.aws_iam_role.control_plane[*].arn)
+  role_arn                  = one(aws_iam_role.control_plane[*].arn)
   version                   = "1.21"
-  tags                      = local.tags
 
   vpc_config {
     security_group_ids = [one(aws_security_group.control_plane[*].id)]
     subnet_ids         = aws_subnet.current.*.id
   }
 
-  depends_on = [aws_cloudwatch_log_group.cluster]
+  depends_on = [
+    aws_cloudwatch_log_group.cluster,
+    aws_iam_role_policy_attachment.control_plane_cluster_policy,
+  ]
 }
 
 data "tls_certificate" "cluster" {
   # Used for obtaining the thumbprints provided to the OIDC provider
   # h/t https://marcincuber.medium.com/amazon-eks-with-oidc-provider-iam-roles-for-kubernetes-services-accounts-59015d15cb0c
-  # url = data.aws_eks_cluster.platform.identity.0.oidc.0.issuer
   url = aws_eks_cluster.current.identity.0.oidc.0.issuer
 }
 
@@ -51,9 +42,9 @@ resource "aws_iam_openid_connect_provider" "default" {
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.cluster.certificates.0.sha1_fingerprint]
   url             = aws_eks_cluster.current.identity.0.oidc.0.issuer
-  tags = merge(local.tags, {
+  tags = {
     Name = "${terraform.workspace}-oidc-provider"
-  })
+  }
 }
 
 # aws-auth configMap
@@ -68,7 +59,7 @@ resource "kubernetes_config_map" "aws_auth" {
 
   data = {
     mapRoles = <<MAPROLES
-- rolearn: ${one(data.aws_iam_role.node[*].arn)}
+- rolearn: ${one(aws_iam_role.node[*].arn)}
   username: system:node:{{EC2PrivateDNSName}}
   groups:
   - system:bootstrappers
@@ -91,7 +82,6 @@ resource "aws_cloudwatch_log_group" "cluster" {
 # Networking
 resource "aws_vpc" "current" {
   cidr_block = "10.0.0.0/16"
-  tags       = local.tags
 }
 
 resource "aws_subnet" "current" {
@@ -102,20 +92,18 @@ resource "aws_subnet" "current" {
   map_public_ip_on_launch = true
   vpc_id                  = one(aws_vpc.current[*].id)
 
-  tags = merge(local.tags, {
+  tags = {
     Name = "${local.name}-${local.availability_zones[count.index]}"
     # https://aws.amazon.com/premiumsupport/knowledge-center/eks-vpc-subnet-discovery/
     "kubernetes.io/cluster/${local.name}" = "shared"
-  })
+  }
 }
 
 resource "aws_internet_gateway" "current" {
-  tags   = local.tags
   vpc_id = one(aws_vpc.current[*].id)
 }
 
 resource "aws_route_table" "current" {
-  tags   = local.tags
   vpc_id = one(aws_vpc.current[*].id)
 }
 
@@ -135,7 +123,6 @@ resource "aws_route_table_association" "current" {
 resource "aws_security_group" "control_plane" {
   description = "Cluster communication with worker nodes."
   name        = local.name
-  tags        = local.tags
   vpc_id      = one(aws_vpc.current[*].id)
 
   egress {
@@ -201,7 +188,12 @@ resource "helm_release" "metrics_server" {
 ### Node groups
 ###
 
-# data "aws_iam_role"
+# Public key for SSH access to nodes
+resource "aws_key_pair" "demo" {
+  key_name   = "demo-key"
+  public_key = var.public_key
+}
+
 resource "aws_eks_node_group" "ng" {
   # all instances in node group should be the same instance type, or at least have the same vCPU and memory resources.
   # see: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
@@ -212,17 +204,17 @@ resource "aws_eks_node_group" "ng" {
   disk_size       = 50
   instance_types  = ["t3.medium"]
   node_group_name = "${terraform.workspace}-normal-${replace(each.value.availability_zone, local.region, "")}"
-  node_role_arn   = one(data.aws_iam_role.node[*].arn)
+  node_role_arn   = aws_iam_role.node.arn
   subnet_ids      = [each.value.id]
 
-  labels = merge(local.labels, {
+  labels = {
     spot   = true
     az     = each.value.availability_zone
     region = local.region
-  })
+  }
 
   remote_access {
-    ec2_ssh_key = var.key_pair_name
+    ec2_ssh_key = aws_key_pair.demo.key_name
   }
 
   scaling_config {
@@ -231,9 +223,9 @@ resource "aws_eks_node_group" "ng" {
     min_size     = 0
   }
 
-  tags = merge(local.tags, {
+  tags = {
     Name = "${terraform.workspace}-normal-${replace(each.value.availability_zone, local.region, "")}"
-  })
+  }
 
   lifecycle {
     ignore_changes = [scaling_config[0].desired_size]
@@ -242,7 +234,11 @@ resource "aws_eks_node_group" "ng" {
   # Force the node group to depend on aws-auth configmap; otherwise it gets created automatically and we have to import it
   # TODO: Also ensure that IAM Role permissions are created before and deleted after EKS Node Group handling,
   # otherwise, EKS will not be able to properly delete EC2 Instances and Elastic Network Interfaces.
-  depends_on = [kubernetes_config_map.aws_auth]
+  depends_on = [
+    aws_iam_role_policy_attachment.control_plane_cluster_policy,
+    aws_eks_cluster.current,
+    kubernetes_config_map.aws_auth,
+  ]
 }
 
 ###
@@ -251,7 +247,6 @@ resource "aws_eks_node_group" "ng" {
 resource "aws_iam_policy" "cluster_node_policy" {
   name   = "demo-node"
   policy = data.aws_iam_policy_document.cluster_node_policy_doc.json
-  tags   = local.tags
 }
 
 data "aws_iam_policy_document" "cluster_node_policy_doc" {
@@ -288,12 +283,81 @@ data "aws_iam_policy_document" "cluster_node_policy_doc" {
   }
 }
 
+# Control plane role
+resource "aws_iam_role" "control_plane" {
+  name = "demo-control-plane"
+
+  assume_role_policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "eks.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+POLICY
+}
+
+# Worker roles
+resource "aws_iam_role" "node" {
+  name = "demo-node"
+
+  assume_role_policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+POLICY
+}
+
 resource "aws_iam_role_policy_attachment" "cluster_node_iam_role_attachment" {
   policy_arn = one(aws_iam_policy.cluster_node_policy[*].arn)
-  role       = data.aws_iam_role.node.name
+  role       = aws_iam_role.node.name
 }
 
 resource "aws_iam_role_policy_attachment" "node_plus_cloudwatch_agent" {
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
-  role       = data.aws_iam_role.node.name
+  role       = aws_iam_role.node.name
+}
+
+resource "aws_iam_role_policy_attachment" "control_plane_cluster_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = one(aws_iam_role.control_plane[*].name)
+}
+
+resource "aws_iam_role_policy_attachment" "control_plane_service_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
+  role       = one(aws_iam_role.control_plane[*].name)
+}
+
+resource "aws_iam_role_policy_attachment" "node_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = one(aws_iam_role.node[*].name)
+}
+
+resource "aws_iam_role_policy_attachment" "node_cni_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = one(aws_iam_role.node[*].name)
+}
+
+resource "aws_iam_role_policy_attachment" "node_container_registry_ro" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = one(aws_iam_role.node[*].name)
+}
+
+resource "aws_ecr_repository" "queue-watcher" {
+  name = "queue-watcher"
 }
