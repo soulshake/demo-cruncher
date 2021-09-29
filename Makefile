@@ -130,7 +130,7 @@ nodes-show: ## Show node groups
 
 .PHONY: asg-list
 asg-list: ## List autoscaling groups
-	aws autoscaling describe-auto-scaling-groups | jq -r '.AutoScalingGroups[].AutoScalingGroupName' # Tags[] | select(.Key == "Name")'
+	aws autoscaling describe-auto-scaling-groups | jq -r '.AutoScalingGroups[].AutoScalingGroupName'
 
 ASG ?=
 .PHONY: asg-activity

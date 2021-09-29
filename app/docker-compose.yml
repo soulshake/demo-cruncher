@@ -1,7 +1,5 @@
 version: "3.4"
 
-# For descriptions of the various services defined here, see the `platform` README.
-
 services:
   queue-watcher:
     build:

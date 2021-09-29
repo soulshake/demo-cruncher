@@ -4,9 +4,6 @@ metadata:
   generateName: demo-${WORKSPACE}-
 spec:
   backoffLimit: 0
-  completions: 1
-  parallelism: 1
-  ttlSecondsAfterFinished: 21600 # six hours
   template:
     metadata:
       labels:
