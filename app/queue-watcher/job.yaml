@@ -3,71 +3,25 @@ kind: Job
 metadata:
   generateName: demo-
 spec:
-  backoffLimit: 0
   template:
     metadata:
       labels:
         app: demo-pipeline
-      annotations:
-        task: ${TASK}
     spec:
-      # Note: a restartPolicy of OnFailure results in failed pods being deleted. Set this to 'Never' when debugging.
-      # See: https://kubernetes.io/docs/concepts/workloads/controllers/job/#handling-pod-and-container-failures
       restartPolicy: Never
-      volumes:
-      # Store the message attributes in a volume accessible by all containers
-      - name: state
-        emptyDir: {}
-      - name: podinfo
-        downwardAPI:
-          items:
-          - path: "annotations"
-            fieldRef:
-              fieldPath: metadata.annotations
-
-      # Note that init containers do not support lifecycle, livenessProbe, readinessProbe, or startupProbe because they must run to completion before the Pod can be ready.
-      # Also, if an initContainer fails, the containers will be stuck forever in PodInitializing.
-      initContainers:
-      - name: decode-message
-        image: nixery.dev/shell/jq/gnugrep/gnused
-        imagePullPolicy: IfNotPresent
-        command:
-        - bash
-        - -c
-        - |
-          set -euo pipefail
-          task_b64=$(cat /etc/podinfo/annotations | grep '^task=' | sed 's/^task=//' | sed 's/"//g')
-          echo "${task_b64}" | base64 -d | jq '.' | tee /state/task.json
-
-          # Save message metadata in our /state volume which is shared across containers.
-          cat /state/task.json | jq -r '.duration' | tee /state/DURATION
-          cat /state/task.json | jq -r '.target' | tee /state/TARGET
-
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "100Mi"
-        volumeMounts:
-        - mountPath: "/etc/podinfo"
-          name: podinfo
-        - mountPath: "/state"
-          name: state
-
-      ###
-      ### Below, we define the actual job containers (as opposed to initContainers), which run in parallel.
-      ###
       containers:
-      # Do the actual "work"
       - name: cruncher-pipeline
-        image: nixery.dev/shell/iputils
+        image: nixery.dev/shell/iputils/jq
         imagePullPolicy: IfNotPresent
         command:
         - sh
         - -c
         - |
           set -euo pipefail
-          duration=$(cat /state/DURATION)
-          target=$(cat /state/TARGET)
+          echo "TASK: ${TASK}"
+          # Note: we use single quotes here; the TASK variable is expanded by envsubst and already contains double quotes
+          duration=$(echo '${TASK}' | jq -r .duration)
+          target=$(echo '${TASK}' | jq -r .target)
           timeout=$(( duration + 30 ))
           echo "Pinging ${target} for ${duration} seconds!"
           ping -w "${duration}" "${target}"
@@ -76,6 +30,3 @@ spec:
           requests:
             cpu: "100m"
             memory: "100Mi"
-        volumeMounts:
-        - mountPath: "/state"
-          name: state
