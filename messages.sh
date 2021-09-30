@@ -41,6 +41,25 @@ show_jobs() {
     echo
 }
 
+pull_from_deadletter() {
+    local count=${1:-1} result
+    if [ "${1}" = "--all" ]; then
+        count=$(QUEUE_URL=${QUEUE_URL}-deadletter show_queue | jq -r '.Attributes.ApproximateNumberOfMessages')
+    fi
+
+    # QUEUE_URL=${QUEUE_URL}-deadletter show_queue
+    echo "Pulling ${count} messages from deadletter queue..."
+    for i in $(seq 0 "${count}"); do
+        result=$(aws sqs receive-message --queue-url "${QUEUE_URL}-deadletter" | jq '.Messages[0]')
+        if [ -z "${result}" ]; then
+            log_error "Got no result when pulling from deadletter queue."
+            exit 1
+        fi
+        aws sqs send-message --queue-url "${QUEUE_URL}" --message-body "$(echo "${result}" | jq -r '.Body')"
+        aws sqs delete-message --queue-url "${QUEUE_URL}-deadletter" --receipt-handle "$(echo "${result}" | jq -r '.ReceiptHandle')"
+    done
+}
+
 purge_queue() {
     echo "Purging queue ${QUEUE_URL}..."
     show_queue
@@ -71,6 +90,10 @@ main() {
     -a | --add)
         shift
         add_messages "$@"
+        ;;
+    -d | --deadletter)
+        shift
+        pull_from_deadletter "$@"
         ;;
     -p | --purge)
         purge_queue
