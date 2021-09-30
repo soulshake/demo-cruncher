@@ -2,9 +2,11 @@
 
 This is a simple demo app to demonstrate cluster autoscaling on EKS.
 
-A `queue-watcher` deployment is created, which monitors an SQS queue. When messages appear in the queue, the deployment creates enough Kubernetes jobs to handle each message.
+A `queue-watcher` deployment is created, which monitors an SQS queue. When messages appear in the queue, the deployment:
 
-Each job pops a message from the queue, processes it, and deletes it.
+- receives a message from the queue
+- creates a Kubernetes job to process it
+- deletes the message from the queue
 
 If more resources are needed, the cluster autoscaler kicks in to add more nodes.
 
@@ -18,6 +20,7 @@ The `./app` directory contains everything needed to run one instantiation of the
 terraform workspace new staging
 make plan
 make apply
+
 terraform workspace new production
 make plan
 make apply
@@ -64,7 +67,7 @@ In `./demo-cluster/`:
 
 ```
 terraform init
-terraform workspace select demo-cluster
+terraform workspace new demo-cluster
 make plan
 make apply
 ```
@@ -109,11 +112,31 @@ Add some messages to the queue (ensure `AWS_REGION` and `AWS_ACCOUNT_ID` are set
 ./messages.sh --add 1
 ```
 
-or:
+The values of `TARGET` and `DURATION` environment variables affect the resulting queue messages:
+
+
 ```
-export QUEUE_URL=$(terraform -chdir=app output -json | jq -r .queue_url.value)
-aws sqs send-message --queue-url "${QUEUE_URL}" --message-body '{ "target": "goo.gl", "duration": "1"}'
+TARGET=example.com DURATION=60 ./messages.sh --add 1  # this job will ping example.com for 60 seconds
+TARGET=invalid DURATION=10 ./messages.sh --add 1      # this job will fail
 ```
+
+### Requeue failed jobs
+
+To re-add failed tasks to the queue and delete the failed jobs, run:
+
+```
+./requeue-failed.sh
+```
+
+### Reset jobs and queue
+
+To purge the queue and all jobs, run:
+
+```
+./messages.sh --purge
+```
+
+### Behold the autoscaling
 
 As more messages are added to the queue, new nodes should be created.
 

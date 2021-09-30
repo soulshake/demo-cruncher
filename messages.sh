@@ -6,7 +6,6 @@ AWS_REGION=${AWS_REGION?Please set the AWS_REGION environment variable.}
 AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID?Please set the AWS_REGION environment variable.}
 WORKSPACE=${WORKSPACE?Please set the WORKSPACE environment variable (should match the Terraform workspace in ./app).}
 QUEUE_URL=https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/demo-${WORKSPACE}
-DEADLETTER_QUEUE_URL=${QUEUE_URL}-deadletter
 
 add_messages() {
     local count target duration msg
@@ -26,10 +25,6 @@ add_messages() {
     show_queue
 }
 
-show_deadletter_queue() {
-    QUEUE_URL=${DEADLETTER_QUEUE_URL} show_queue
-}
-
 show_queue() {
     (
         set -x
@@ -44,24 +39,6 @@ show_jobs() {
         kubectl get jobs --selector="${SELECTOR}"
     )
     echo
-}
-
-requeue_from_deadletter() {
-    local count=${1:-1} result
-    if [ "${1}" = "--all" ]; then
-        count=$(show_deadletter_queue | jq -r '.Attributes.ApproximateNumberOfMessages')
-    fi
-
-    echo "Pulling (up to) ${count} messages from deadletter queue..."
-    for i in $(seq 1 "${count}"); do
-        result=$(aws sqs receive-message --queue-url "${DEADLETTER_QUEUE_URL}" | jq '.Messages[0]')
-        if [ -z "${result}" ]; then
-            echo "Got no result when pulling from deadletter queue."
-            exit 1
-        fi
-        aws sqs send-message --queue-url "${QUEUE_URL}" --message-body "$(echo "${result}" | jq -r '.Body')"
-        aws sqs delete-message --queue-url "${DEADLETTER_QUEUE_URL}" --receipt-handle "$(echo "${result}" | jq -r '.ReceiptHandle')"
-    done
 }
 
 purge_queue() {
@@ -86,7 +63,6 @@ usage() {
     echo -e "-h, --help\t\t\t show usage"
     echo -e "-a, --add [COUNT]\t\t generate and enqueue <count> (default 1) messages (\$QUEUE_URL, \$TARGET, \$DURATION)"
     echo -e "-p, --purge\t\t\t purge queue and jobs (\$QUEUE_URL, \$SELECTOR)"
-    echo -e "-r, --requeue [--all|COUNT]\t requeue <count> (default 1) messages from deadletter queue (\$QUEUE_URL)"
     echo -e "-s, --show\t\t\t show queue attributes (\$QUEUE_URL)"
 }
 
@@ -100,13 +76,8 @@ main() {
         purge_queue
         purge_jobs
         ;;
-    -r | --requeue)
-        shift
-        requeue_from_deadletter "$@"
-        ;;
     -s | --show)
         show_queue
-        show_deadletter_queue
         show_jobs
         ;;
     *)
