@@ -20,7 +20,7 @@ locals {
 ###
 
 resource "aws_eks_cluster" "current" {
-  name                      = "demo"
+  name                      = "demo" # TODO: use Terraform workspace as the cluster name
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
   role_arn                  = one(aws_iam_role.control_plane[*].arn)
   version                   = "1.21"

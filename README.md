@@ -2,9 +2,11 @@
 
 This is a simple demo app to demonstrate cluster autoscaling on EKS.
 
-A `queue-watcher` deployment is created, which monitors an SQS queue. When messages appear in the queue, the deployment creates enough Kubernetes jobs to handle each message.
+A `queue-watcher` deployment is created, which monitors an SQS queue. When messages appear in the queue, the deployment:
 
-Each job pops a message from the queue, processes it, and deletes it.
+- receives a message from the queue
+- creates a Kubernetes job to process it
+- deletes the message from the queue
 
 If more resources are needed, the cluster autoscaler kicks in to add more nodes.
 
@@ -18,6 +20,7 @@ The `./app` directory contains everything needed to run one instantiation of the
 terraform workspace new staging
 make plan
 make apply
+
 terraform workspace new production
 make plan
 make apply
@@ -64,7 +67,7 @@ In `./demo-cluster/`:
 
 ```
 terraform init
-terraform workspace select demo-cluster
+terraform workspace new demo-cluster
 make plan
 make apply
 ```
