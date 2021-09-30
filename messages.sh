@@ -53,10 +53,10 @@ requeue_from_deadletter() {
     fi
 
     echo "Pulling (up to) ${count} messages from deadletter queue..."
-    for i in $(seq 0 "${count}"); do
+    for i in $(seq 1 "${count}"); do
         result=$(aws sqs receive-message --queue-url "${DEADLETTER_QUEUE_URL}" | jq '.Messages[0]')
         if [ -z "${result}" ]; then
-            log_error "Got no result when pulling from deadletter queue."
+            echo "Got no result when pulling from deadletter queue."
             exit 1
         fi
         aws sqs send-message --queue-url "${QUEUE_URL}" --message-body "$(echo "${result}" | jq -r '.Body')"
