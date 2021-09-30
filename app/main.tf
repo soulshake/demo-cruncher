@@ -89,20 +89,12 @@ resource "kubernetes_deployment" "queue_watcher" {
           image_pull_policy = "Always"
           name              = "queue-watcher"
           env {
-            name  = "IMAGE_TAG"
-            value = terraform.workspace
-          }
-          env {
             name  = "MAX_PENDING"
             value = var.max_pending
           }
           env {
             name  = "QUEUE_URL"
             value = aws_sqs_queue.queue.url
-          }
-          env {
-            name  = "WORKSPACE"
-            value = terraform.workspace
           }
           resources {
             requests = {
