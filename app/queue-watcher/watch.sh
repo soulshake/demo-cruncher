@@ -12,11 +12,15 @@ shopt -s inherit_errexit
 # Never create more than MAX_PENDING jobs.
 MAX_PENDING=${MAX_PENDING:-5}
 : "${AWS_REGION?Please set the AWS_REGION environment variable.}"
+JOB_YAML_PATH=${JOB_YAML_PATH:-/src/job.yaml}
 
 kickoff_job() {
-    log_verbose "Kicking off job..."
+    local job task
+    task=$(echo "${1}" | base64 -w0)
+    log_verbose "Kicking off job with task: ${1}"
     # shellcheck disable=SC2016
-    envsubst '${AWS_REGION},${QUEUE_URL}' </src/job.yaml | kubectl create -f -
+    job=$(TASK=${task} envsubst '${TASK}' <"${JOB_YAML_PATH}")
+    echo "${job}" | kubectl create -f -
 }
 
 get_pending_count() {
@@ -48,6 +52,25 @@ block_if_too_many_pending() {
     done
 }
 
+pop_message() {
+    local body messages msg receipt_handle
+    messages=$(aws sqs receive-message --max-number-of-messages 1 --attribute-names All --wait-time-seconds 10 --queue-url "${QUEUE_URL}")
+    if [ -z "${messages}" ]; then
+        log_error "Couldn't receive messages"
+        exit 1
+    fi
+    if msg=$(echo "$messages" | jq '.Messages[0]') >/dev/null; then
+        body=$(echo "${msg}" | jq -r .Body)
+        receipt_handle=$(echo "${msg}" | jq -r '.ReceiptHandle')
+        kickoff_job "${body}"
+        aws sqs delete-message --queue-url "${QUEUE_URL}" --receipt-handle "${receipt_handle}"
+    else
+        log_error "Invalid messages:"
+        log "${messages}"
+        exit 1
+    fi
+}
+
 main() {
     # Continuously poll the queue and create a Kubernetes job for each message
     log_verbose "starting watcher with QUEUE_URL '${QUEUE_URL}'..."
@@ -58,13 +81,14 @@ main() {
         mc="$(get_message_count)"
         pc="$(get_pending_count)"
         to_create=$((mc - pc))
+        log_notice "mc = ${mc}, pc = ${pc}, to_create = ${to_create}"
         if [ "${to_create}" -lt 1 ]; then
             log_verbose "There at least as many pending jobs as messages in the queue (${pc} >= ${mc}). Taking a nap."
             sleep 3 && continue
         fi
         log_success "${mc} message(s) in the queue; ${pc} pending pod(s). Creating ${to_create} job(s), within the limits of MAX_PENDING (${MAX_PENDING})."
         while [ "${to_create}" -ge 1 ]; do
-            if kickoff_job; then
+            if pop_message; then
                 log_success "Kicked off job"
                 sleep 5 # Allow a few seconds for get-queue-attributes to reflect reality?
             else
@@ -76,7 +100,7 @@ main() {
             block_if_too_many_pending
         done
         log_success "No more to create."
-        sleep 3
+        sleep 1
     done
 }
 

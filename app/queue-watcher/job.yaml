@@ -8,6 +8,8 @@ spec:
     metadata:
       labels:
         app: demo-pipeline
+      annotations:
+        task: ${TASK}
     spec:
       # Note: a restartPolicy of OnFailure results in failed pods being deleted. Set this to 'Never' when debugging.
       # See: https://kubernetes.io/docs/concepts/workloads/controllers/job/#handling-pod-and-container-failures
@@ -17,41 +19,38 @@ spec:
       # Store the message attributes in a volume accessible by all containers
       - name: state
         emptyDir: {}
+      - name: podinfo
+        downwardAPI:
+          items:
+          - path: "annotations"
+            fieldRef:
+              fieldPath: metadata.annotations
 
       # Note that init containers do not support lifecycle, livenessProbe, readinessProbe, or startupProbe because they must run to completion before the Pod can be ready.
       # Also, if an initContainer fails, the containers will be stuck forever in PodInitializing.
       initContainers:
-      - name: fetch-message
-        image: nixery.dev/shell/awscli2/jq
+      - name: decode-message
+        image: nixery.dev/shell/jq/gnugrep/gnused
         imagePullPolicy: IfNotPresent
         command:
         - bash
         - -c
         - |
           set -euo pipefail
-          message=$(aws sqs receive-message --max-number-of-messages 1 --attribute-names All --wait-time-seconds 10 --queue-url "${QUEUE_URL}")
-          if [ -z "${message}" ]; then
-            echo "No message was received. Bailing."
-            exit 1
-          fi
-          # Save message metadata in our /state volume which is shared across containers.
-          echo "${message}" | jq -r '.Messages[0]' | tee /state/message.json
-          cat /state/message.json | jq -r '.ReceiptHandle' | tee /state/RECEIPT_ID
-          cat /state/message.json | jq -r '.Body' | jq . | tee /state/body.json
-          cat /state/body.json | jq -r '.duration' | tee /state/DURATION
-          cat /state/body.json | jq -r '.target' | tee /state/TARGET
+          task_b64=$(cat /etc/podinfo/annotations | grep '^task=' | sed 's/^task=//' | sed 's/"//g')
+          echo "${task_b64}" | base64 -d | jq '.' | tee /state/task.json
 
-        env:
-          # Note: These are replaced via envsubst
-        - name: AWS_REGION
-          value: "${AWS_REGION}"
-        - name: QUEUE_URL
-          value: "${QUEUE_URL}"
+          # Save message metadata in our /state volume which is shared across containers.
+          cat /state/task.json | jq -r '.duration' | tee /state/DURATION
+          cat /state/task.json | jq -r '.target' | tee /state/TARGET
+
         resources:
           requests:
             cpu: "100m"
             memory: "100Mi"
         volumeMounts:
+        - mountPath: "/etc/podinfo"
+          name: podinfo
         - mountPath: "/state"
           name: state
 
@@ -61,7 +60,7 @@ spec:
       containers:
       # Do the actual "work"
       - name: cruncher-pipeline
-        image: nixery.dev/shell/awscli2/iputils
+        image: nixery.dev/shell/iputils
         imagePullPolicy: IfNotPresent
         command:
         - sh
@@ -71,11 +70,8 @@ spec:
           duration=$(cat /state/DURATION)
           target=$(cat /state/TARGET)
           timeout=$(( duration + 30 ))
-          echo "Pinging ${target} for ${duration} seconds, but first changing visibility to ${timeout}."
-          aws sqs change-message-visibility --queue-url "${QUEUE_URL}" --visibility-timeout "${timeout}" --receipt-handle "$(cat /state/RECEIPT_ID)"
+          echo "Pinging ${target} for ${duration} seconds!"
           ping -w "${duration}" "${target}"
-          set -x
-          aws sqs delete-message --queue-url "${QUEUE_URL}" --receipt-handle "$(cat /state/RECEIPT_ID)"
           echo "All done!"
         resources:
           requests:
