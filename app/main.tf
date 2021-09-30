@@ -41,14 +41,6 @@ locals {
 # SQS queue
 resource "aws_sqs_queue" "queue" {
   name = local.namespace
-
-  redrive_policy = jsonencode({
-    deadLetterTargetArn = aws_sqs_queue.deadletter.arn
-    maxReceiveCount     = 4
-  })
-}
-resource "aws_sqs_queue" "deadletter" {
-  name = "${local.namespace}-deadletter"
 }
 
 # Kubernetes resources

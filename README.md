@@ -129,3 +129,19 @@ To view autoscaling activity:
 make asg-list
 make asg-activity ASG=<id from previous command>
 ```
+
+## Requeue failed jobs
+
+To re-add failed tasks to the queue and delete the failed jobs, run:
+
+```
+./requeue-failed.sh
+```
+
+## Reset jobs and queue
+
+To purge the queue and all jobs, run:
+
+```
+./messages --purge
+```

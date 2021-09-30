@@ -3,8 +3,11 @@ kind: Job
 metadata:
   generateName: demo-
 spec:
+  backoffLimit: 3
   template:
     metadata:
+      annotations:
+        task: '${TASK}'
       labels:
         app: demo-pipeline
     spec:
