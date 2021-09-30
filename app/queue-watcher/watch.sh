@@ -64,7 +64,6 @@ main() {
         fi
         log_success "${mc} message(s) in the queue; ${pc} pending pod(s). Creating ${to_create} job(s), within the limits of MAX_PENDING (${MAX_PENDING})."
         while [ "${to_create}" -ge 1 ]; do
-            block_if_too_many_pending
             if kickoff_job; then
                 log_success "Kicked off job"
                 sleep 5 # Allow a few seconds for get-queue-attributes to reflect reality?
@@ -74,6 +73,7 @@ main() {
             fi
             to_create=$((to_create - 1))
             log_verbose "${to_create} left to create."
+            block_if_too_many_pending
         done
         log_success "No more to create."
         sleep 3
