@@ -16,7 +16,7 @@ MAX_PENDING=${MAX_PENDING:-5}
 kickoff_job() {
     log_verbose "Kicking off job..."
     # shellcheck disable=SC2016
-    envsubst '${AWS_REGION},${QUEUE_URL},${WORKSPACE}' </src/job.yaml | kubectl create -f -
+    envsubst '${AWS_REGION},${QUEUE_URL}' </src/job.yaml | kubectl create -f -
 }
 
 get_pending_count() {
@@ -50,7 +50,7 @@ block_if_too_many_pending() {
 
 main() {
     # Continuously poll the queue and create a Kubernetes job for each message
-    log_verbose "starting watcher with QUEUE_URL '${QUEUE_URL}' and WORKSPACE '${WORKSPACE}'..."
+    log_verbose "starting watcher with QUEUE_URL '${QUEUE_URL}'..."
     log_verbose "$(get_queue_attributes)" # informational; shows all queue attributes
     while true; do
         log_debug "Status at beginning of loop:"

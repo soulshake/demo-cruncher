@@ -1,13 +1,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: demo-${WORKSPACE}-
+  generateName: demo-
 spec:
   backoffLimit: 0
   template:
     metadata:
       labels:
-        workspace: ${WORKSPACE}
         app: demo-pipeline
     spec:
       # Note: a restartPolicy of OnFailure results in failed pods being deleted. Set this to 'Never' when debugging.
@@ -23,8 +22,8 @@ spec:
       # Also, if an initContainer fails, the containers will be stuck forever in PodInitializing.
       initContainers:
       - name: fetch-message
-        image: amazon/aws-cli
-        imagePullPolicy: Always
+        image: nixery.dev/shell/awscli2/jq
+        imagePullPolicy: IfNotPresent
         command:
         - bash
         - -c
@@ -35,7 +34,6 @@ spec:
             echo "No message was received. Bailing."
             exit 1
           fi
-          yum install -y jq
           # Save message metadata in our /state volume which is shared across containers.
           echo "${message}" | jq -r '.Messages[0]' | tee /state/message.json
           cat /state/message.json | jq -r '.ReceiptHandle' | tee /state/RECEIPT_ID
@@ -49,8 +47,6 @@ spec:
           value: "${AWS_REGION}"
         - name: QUEUE_URL
           value: "${QUEUE_URL}"
-        - name: WORKSPACE
-          value: "${WORKSPACE}"
         resources:
           requests:
             cpu: "100m"
@@ -65,8 +61,8 @@ spec:
       containers:
       # Do the actual "work"
       - name: cruncher-pipeline
-        image: amazon/aws-cli
-        imagePullPolicy: Always
+        image: nixery.dev/shell/awscli2/iputils
+        imagePullPolicy: IfNotPresent
         command:
         - sh
         - -c
@@ -75,7 +71,6 @@ spec:
           duration=$(cat /state/DURATION)
           target=$(cat /state/TARGET)
           timeout=$(( duration + 30 ))
-          yum install -y iputils
           echo "Pinging ${target} for ${duration} seconds, but first changing visibility to ${timeout}."
           aws sqs change-message-visibility --queue-url "${QUEUE_URL}" --visibility-timeout "${timeout}" --receipt-handle "$(cat /state/RECEIPT_ID)"
           ping -w "${duration}" "${target}"
