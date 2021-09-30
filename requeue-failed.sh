@@ -24,9 +24,10 @@ retry_failed_jobs() {
         if [ -n "${task}" ] && aws sqs send-message --queue-url "${QUEUE_URL}" --message-body "${task}"; then
             echo "✓ Requeued task: ${task}"
             kubectl delete job "${name}"
+            echo "✓ Deleted job: ${name}"
         else
             if [ -z "${task}" ]; then
-                echo "✘ ERROR: Couldn't extract task from job '${name}'."
+                echo "$(tput setaf 1)✘ ERROR: Couldn't extract task from job '${name}'.$(tput sgr0)"
             else
                 echo "✘ ERROR: Could not requeue job '${name}' with task: ${task}"
             fi
