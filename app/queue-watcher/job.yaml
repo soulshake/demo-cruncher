@@ -14,7 +14,6 @@ spec:
       # Note: a restartPolicy of OnFailure results in failed pods being deleted. Set this to 'Never' when debugging.
       # See: https://kubernetes.io/docs/concepts/workloads/controllers/job/#handling-pod-and-container-failures
       restartPolicy: Never
-      serviceAccountName: cruncher
       volumes:
       # Store the message attributes in a volume accessible by all containers
       - name: state

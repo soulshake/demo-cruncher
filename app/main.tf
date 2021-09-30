@@ -110,12 +110,6 @@ resource "kubernetes_deployment" "queue_watcher" {
 }
 
 # Roles
-resource "aws_iam_role" "cruncher" {
-  name               = "demo-cruncher-${terraform.workspace}"
-  description        = "cruncher role for ${terraform.workspace}"
-  assume_role_policy = trimspace(data.aws_iam_policy_document.assume_role_with_oidc.json)
-}
-
 resource "aws_iam_role" "queue_watcher" {
   name               = "demo-queue-watcher-${terraform.workspace}"
   description        = "queue-watcher role for ${terraform.workspace}"
@@ -137,7 +131,6 @@ data "aws_iam_policy_document" "assume_role_with_oidc" {
       test     = "StringEquals"
       variable = "${local.oidc_issuer}:sub"
       values = [
-        "system:serviceaccount:${local.namespace}:cruncher",
         "system:serviceaccount:${local.namespace}:queue-watcher",
       ]
     }
@@ -145,12 +138,6 @@ data "aws_iam_policy_document" "assume_role_with_oidc" {
 }
 
 # Policies
-resource "aws_iam_policy" "cruncher" {
-  name        = "${aws_iam_role.cruncher.name}-policy" # role name already includes workspace
-  description = "Allows access to resources needed by ${aws_iam_role.cruncher.name} for the demo pipeline."
-  policy      = data.aws_iam_policy_document.cruncher.json
-}
-
 resource "aws_iam_policy" "queue_watcher" {
   name        = "${aws_iam_role.queue_watcher.name}-policy"
   description = "Allows access to resources needed by ${aws_iam_role.queue_watcher.name} for the demo pipeline."
@@ -158,21 +145,7 @@ resource "aws_iam_policy" "queue_watcher" {
 }
 
 
-data "aws_ecr_repository" "queue_watcher" {
-  name = "queue-watcher"
-}
-
-data "aws_iam_policy_document" "cruncher" {
-  statement {
-    sid = "CanReadEcr"
-    actions = [
-      "ecr:DescribeImages",
-      "ecr:DescribeRepositories",
-    ]
-    resources = [
-      data.aws_ecr_repository.queue_watcher.arn
-    ]
-  }
+data "aws_iam_policy_document" "queue_watcher" {
   statement {
     sid = "CanPopMessages"
     actions = [
@@ -187,40 +160,9 @@ data "aws_iam_policy_document" "cruncher" {
   }
 }
 
-data "aws_iam_policy_document" "queue_watcher" {
-  statement {
-    sid = "CanDescribeQueue"
-    actions = [
-      "sqs:GetQueueAttributes",
-    ]
-    resources = [
-      aws_sqs_queue.queue.arn,
-    ]
-  }
-}
-
-resource "aws_iam_role_policy_attachment" "cruncher" {
-  role       = aws_iam_role.cruncher.name
-  policy_arn = aws_iam_policy.cruncher.arn
-}
-
 resource "aws_iam_role_policy_attachment" "queue_watcher" {
   role       = aws_iam_role.queue_watcher.name
   policy_arn = aws_iam_policy.queue_watcher.arn
-}
-
-# service accounts
-resource "kubernetes_service_account" "cruncher" {
-  automount_service_account_token = true
-  metadata {
-    name      = "cruncher"
-    namespace = kubernetes_namespace.ns.metadata.0.name
-    labels    = local.cruncher_labels
-    annotations = {
-      "eks.amazonaws.com/role-arn" : aws_iam_role.cruncher.arn
-    }
-  }
-  provider = kubernetes.demo
 }
 
 resource "kubernetes_service_account" "queue_watcher" {
@@ -237,8 +179,6 @@ resource "kubernetes_service_account" "queue_watcher" {
 }
 
 # Role bindings
-#
-# Note: No role binding is needed for `cruncher` since it doesn't interact with AWS or k8s.
 #
 resource "kubernetes_role_binding" "queue_watcher" {
   # Needs to be able to create pods
