@@ -3,84 +3,30 @@ kind: Job
 metadata:
   generateName: demo-
 spec:
-  backoffLimit: 0
   template:
     metadata:
       labels:
         app: demo-pipeline
     spec:
-      # Note: a restartPolicy of OnFailure results in failed pods being deleted. Set this to 'Never' when debugging.
-      # See: https://kubernetes.io/docs/concepts/workloads/controllers/job/#handling-pod-and-container-failures
       restartPolicy: Never
-      serviceAccountName: cruncher
-      volumes:
-      # Store the message attributes in a volume accessible by all containers
-      - name: state
-        emptyDir: {}
-
-      # Note that init containers do not support lifecycle, livenessProbe, readinessProbe, or startupProbe because they must run to completion before the Pod can be ready.
-      # Also, if an initContainer fails, the containers will be stuck forever in PodInitializing.
-      initContainers:
-      - name: fetch-message
-        image: nixery.dev/shell/awscli2/jq
-        imagePullPolicy: IfNotPresent
-        command:
-        - bash
-        - -c
-        - |
-          set -euo pipefail
-          message=$(aws sqs receive-message --max-number-of-messages 1 --attribute-names All --wait-time-seconds 10 --queue-url "${QUEUE_URL}")
-          if [ -z "${message}" ]; then
-            echo "No message was received. Bailing."
-            exit 1
-          fi
-          # Save message metadata in our /state volume which is shared across containers.
-          echo "${message}" | jq -r '.Messages[0]' | tee /state/message.json
-          cat /state/message.json | jq -r '.ReceiptHandle' | tee /state/RECEIPT_ID
-          cat /state/message.json | jq -r '.Body' | jq . | tee /state/body.json
-          cat /state/body.json | jq -r '.duration' | tee /state/DURATION
-          cat /state/body.json | jq -r '.target' | tee /state/TARGET
-
-        env:
-          # Note: These are replaced via envsubst
-        - name: AWS_REGION
-          value: "${AWS_REGION}"
-        - name: QUEUE_URL
-          value: "${QUEUE_URL}"
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "100Mi"
-        volumeMounts:
-        - mountPath: "/state"
-          name: state
-
-      ###
-      ### Below, we define the actual job containers (as opposed to initContainers), which run in parallel.
-      ###
       containers:
-      # Do the actual "work"
       - name: cruncher-pipeline
-        image: nixery.dev/shell/awscli2/iputils
+        image: nixery.dev/shell/iputils/jq
         imagePullPolicy: IfNotPresent
         command:
         - sh
         - -c
         - |
           set -euo pipefail
-          duration=$(cat /state/DURATION)
-          target=$(cat /state/TARGET)
+          echo "TASK: ${TASK}"
+          # Note: we use single quotes here; the TASK variable is expanded by envsubst and already contains double quotes
+          duration=$(echo '${TASK}' | jq -r .duration)
+          target=$(echo '${TASK}' | jq -r .target)
           timeout=$(( duration + 30 ))
-          echo "Pinging ${target} for ${duration} seconds, but first changing visibility to ${timeout}."
-          aws sqs change-message-visibility --queue-url "${QUEUE_URL}" --visibility-timeout "${timeout}" --receipt-handle "$(cat /state/RECEIPT_ID)"
+          echo "Pinging ${target} for ${duration} seconds!"
           ping -w "${duration}" "${target}"
-          set -x
-          aws sqs delete-message --queue-url "${QUEUE_URL}" --receipt-handle "$(cat /state/RECEIPT_ID)"
           echo "All done!"
         resources:
           requests:
             cpu: "100m"
             memory: "100Mi"
-        volumeMounts:
-        - mountPath: "/state"
-          name: state
