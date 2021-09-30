@@ -27,15 +27,9 @@ locals {
   oidc_issuer = replace(data.aws_eks_cluster.demo.identity[0].oidc[0].issuer, "https://", "")
   region      = data.aws_region.current.name
 
-  labels = {
-    workspace = terraform.workspace
-  }
-  cruncher_labels = merge(local.labels, {
-    app = "cruncher"
-  })
-  queue_watcher_labels = merge(local.labels, {
+  queue_watcher_labels = {
     app = "queue-watcher"
-  })
+  }
 }
 
 # SQS queue

@@ -6,10 +6,9 @@
 set -euo pipefail
 shopt -s inherit_errexit
 
-# Never create more than MAX_PENDING jobs.
-MAX_PENDING=${MAX_PENDING:-}
-: "${QUEUE_URL?Please set the QUEUE_URL environment variable.}"
+MAX_PENDING=${MAX_PENDING:-} # If set, never create more than MAX_PENDING jobs.
 JOB_YAML_PATH=${JOB_YAML_PATH:-/src/job.yaml}
+: "${QUEUE_URL?Please set the QUEUE_URL environment variable.}"
 
 kickoff_job() {
     local job task=${1}
