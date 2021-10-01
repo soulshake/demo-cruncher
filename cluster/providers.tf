@@ -9,10 +9,6 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.3.0"
     }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.5.0"
-    }
     tls = {
       source  = "hashicorp/tls"
       version = "~> 3.1.0"
@@ -44,16 +40,6 @@ provider "aws" {
 
 data "aws_eks_cluster_auth" "current" {
   name = aws_eks_cluster.current.name
-}
-
-provider "kubernetes" {
-  host = "all-k8s-resources-must-specify-a-provider"
-}
-provider "kubernetes" {
-  alias                  = "demo"
-  host                   = aws_eks_cluster.current.endpoint
-  cluster_ca_certificate = base64decode(aws_eks_cluster.current.certificate_authority.0.data)
-  token                  = data.aws_eks_cluster_auth.current.token
 }
 
 provider "helm" {

@@ -176,6 +176,12 @@ make asg-activity ASG=<id from previous command>
 
 To remove all resources:
 
+In the repo root:
+
+```
+NAMESPACE=${WORKSPACE} envsubst '${AWS_ACCOUNT_ID},${AWS_REGION},${NAMESPACE}' < queue-watcher.yaml | kubectl delete -f -
+```
+
 In `./app/`:
 
 ```
