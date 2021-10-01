@@ -5,7 +5,7 @@ SELECTOR="${SELECTOR:-app=demo-pipeline}"
 AWS_REGION=${AWS_REGION?Please set the AWS_REGION environment variable.}
 AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID?Please set the AWS_REGION environment variable.}
 WORKSPACE=${WORKSPACE?Please set the WORKSPACE environment variable (should match the Terraform workspace in ./app).}
-QUEUE_URL=https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/demo-${WORKSPACE}
+QUEUE_URL=https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/${WORKSPACE}
 
 add_messages() {
     local count target duration msg

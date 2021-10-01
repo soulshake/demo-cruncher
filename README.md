@@ -102,7 +102,7 @@ Update your kube config:
 
 ```
 aws eks update-kubeconfig --name demo
-kubectl config set-context demo --namespace demo-${WORKSPACE}
+kubectl config set-context demo --namespace ${WORKSPACE}
 # ^ WORKSPACE should match the Terraform workspace in ./app
 ```
 
