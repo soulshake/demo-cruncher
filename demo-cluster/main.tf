@@ -195,7 +195,7 @@ resource "aws_eks_node_group" "ng" {
     ignore_changes = [scaling_config[0].desired_size]
   }
 
-  # TODO: Also ensure that IAM Role permissions are created before and deleted after EKS Node Group handling,
+  # Ensure that IAM Role permissions are created before and deleted after EKS Node Group handling,
   # otherwise, EKS will not be able to properly delete EC2 Instances and Elastic Network Interfaces.
   depends_on = [
     aws_eks_cluster.current,

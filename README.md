@@ -100,8 +100,6 @@ In the repo root:
 NAMESPACE=${WORKSPACE} envsubst '${AWS_ACCOUNT_ID},${AWS_REGION},${NAMESPACE}' < queue-watcher.yaml | kubectl apply -f -
 ```
 
-(TODO: replace hardcoded AWS account ID in `queue-watcher.yaml`)
-
 ### Interact with the demo app
 
 Update your kube config:
