@@ -60,7 +60,7 @@ resource "aws_iam_openid_connect_provider" "default" {
   thumbprint_list = [data.tls_certificate.cluster.certificates.0.sha1_fingerprint]
   url             = aws_eks_cluster.current.identity.0.oidc.0.issuer
   tags = {
-    Name = "${terraform.workspace}-oidc-provider"
+    Name = "${local.name}-oidc-provider"
   }
 }
 
@@ -167,7 +167,7 @@ resource "aws_eks_node_group" "ng" {
   cluster_name    = aws_eks_cluster.current.name
   disk_size       = 50
   instance_types  = ["t3.medium"]
-  node_group_name = "${terraform.workspace}-normal-${replace(each.value.availability_zone, local.region, "")}"
+  node_group_name = "${local.name}-normal-${replace(each.value.availability_zone, local.region, "")}"
   node_role_arn   = aws_iam_role.roles["node"].arn
   subnet_ids      = [each.value.id]
 
@@ -188,7 +188,7 @@ resource "aws_eks_node_group" "ng" {
   }
 
   tags = {
-    Name = "${terraform.workspace}-normal-${replace(each.value.availability_zone, local.region, "")}"
+    Name = "${local.name}-normal-${replace(each.value.availability_zone, local.region, "")}"
   }
 
   lifecycle {
