@@ -24,7 +24,7 @@ This command:
 
 ## Summary of resources defined in this repo
 
-The `./demo-cluster` directory contains the definitions for an EKS cluster, node group, associated IAM roles/policies, etc. This directory need only be instantiated once.
+The `./cluster` directory contains the definitions for an EKS cluster, node group, associated IAM roles/policies, etc. This directory need only be instantiated once.
 
 The `./app` directory contains everything needed to run one instantiation of the "app" on AWS. For example, to create a `staging` and `production` environment, you could run:
 
@@ -65,7 +65,7 @@ Ensure the following environment variables are set:
 - `AWS_ACCOUNT_ID`
 - `WORKSPACE=production` (or another value of your choice)
 
-The value of `WORKSPACE` will determine the names of:
+Note: the value of `WORKSPACE` will determine the names of:
 - the Kubernetes namespace
 - the IAM roles, policies, and queue created in `./app/`
 
@@ -73,7 +73,7 @@ Run `make env` to show the current values of these variables.
 
 ### Create the cluster
 
-In `./demo-cluster/`:
+In `./cluster/`:
 
 ```
 terraform init
@@ -182,7 +182,7 @@ In `./app/`:
 terraform destroy
 ```
 
-In `./demo-cluster/`:
+In `./cluster/`:
 
 ```
 terraform destroy

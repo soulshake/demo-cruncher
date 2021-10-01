@@ -38,7 +38,7 @@ env: ## Emit the values of the environment variables we care about
 
 .PHONY: docs
 docs:
-	for dir in app demo-cluster; do
+	for dir in app cluster; do
 		terraform-docs markdown $${dir} > $${dir}/README.md
 	done
 
