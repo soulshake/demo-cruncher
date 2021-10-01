@@ -35,13 +35,7 @@ Each Terraform workspace corresponds to a dedicated SQS queue and IAM roles with
 - Terraform
 - AWS CLI
 - `jq`
-- `make`
-
-To install Terraform to `/usr/local/bin/terraform`:
-
-```
-make deps
-```
+- `make` (optional)
 
 ### Set environment variables
 
@@ -67,12 +61,22 @@ In `./demo-cluster/`:
 
 ```
 terraform init
-terraform workspace new demo-cluster
-make plan
-make apply
+terraform workspace new demo
+terraform apply -target aws_eks_cluster.current
+terraform plan
+terraform apply
 ```
 
 To be able to connect to nodes, set `TF_VAR_public_key` to the desired public key (in OpenSSH format), then plan/apply.
+
+Node groups are created in the 3 standard AWS availability zones by default. To change this, set your desired AZs like so:
+
+```
+export TF_VAR_availability_zones='["g", "e", "f"]'
+make plan
+```
+
+Warning: due to particularities of the Terraform Kubernetes provider, changing values that result in cluster replacement (e.g. changing the value of `var.availability_zones`) after the cluster resources have been created will cause errors regarding Helm resources during planning. In this case, do a targeted apply first, like: `make plan TARGET=aws_eks_cluster.current`, `make apply`.
 
 ### Instantiate the demo app
 
@@ -83,8 +87,8 @@ In `./app/`:
 ```
 terraform init
 terraform workspace new "${WORKSPACE}"
-make plan
-make apply
+terraform plan
+terraform apply
 ```
 
 #### Deploy the K8s resources
@@ -92,7 +96,7 @@ make apply
 In the repo root:
 
 ```
-kubectl apply -f queue-watcher.yaml
+envsubst '${AWS_ACCOUNT_ID},${AWS_REGION}' < queue-watcher.yaml | kubectl apply -f -
 ```
 
 (TODO: replace hardcoded AWS account ID in `queue-watcher.yaml`)
@@ -153,3 +157,23 @@ To view autoscaling activity:
 make asg-list
 make asg-activity ASG=<id from previous command>
 ```
+
+## Teardown
+
+To remove all resources:
+
+In `./app/`:
+
+```
+terraform destroy
+```
+
+In `./demo-cluster/`:
+
+```
+terraform destroy
+```
+
+Manual cleanup:
+- entries in your `~/.kube/config`
+- any CloudWatch log groups that have been created automatically

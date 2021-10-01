@@ -7,11 +7,17 @@ variable "public_key" {
   description = "Public key to provision on nodes."
 }
 
+variable "availability_zones" {
+  default     = ["a", "b", "c"]
+  description = "Availability zones in which to create node groups. Should be provided in the form of letter identifiers (a,b,c); these are appended to name of the active region in order to construct the AZ names."
+  type        = list(string)
+}
+
 locals {
-  availability_zones = ["eu-central-1a", "eu-central-1b", "eu-central-1c"]
+  availability_zones = [for letter in var.availability_zones : "${local.region}${letter}"]
   aws                = 1
   id                 = data.aws_caller_identity.current.account_id
-  name               = "demo"
+  name               = terraform.workspace
   region             = data.aws_region.current.name
 }
 
@@ -20,7 +26,7 @@ locals {
 ###
 
 resource "aws_eks_cluster" "current" {
-  name                      = "demo" # TODO: use Terraform workspace as the cluster name
+  name                      = local.name
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
   role_arn                  = one(aws_iam_role.control_plane[*].arn)
   version                   = "1.21"
@@ -33,6 +39,7 @@ resource "aws_eks_cluster" "current" {
   depends_on = [
     aws_cloudwatch_log_group.cluster,
     aws_iam_role_policy_attachment.control_plane_cluster_policy,
+    aws_subnet.nodes
   ]
 }
 
@@ -51,32 +58,6 @@ resource "aws_iam_openid_connect_provider" "default" {
   }
 }
 
-# aws-auth configMap
-resource "kubernetes_config_map" "aws_auth" {
-  # Tip: ensure node pools depend on this resource; otherwise it gets automatically created, so our own creation fails.
-  depends_on = [aws_eks_cluster.current]
-
-  metadata {
-    name      = "aws-auth"
-    namespace = "kube-system"
-  }
-
-  data = {
-    mapRoles = <<MAPROLES
-- rolearn: ${one(aws_iam_role.node[*].arn)}
-  username: system:node:{{EC2PrivateDNSName}}
-  groups:
-  - system:bootstrappers
-  - system:nodes
-MAPROLES
-
-    mapAccounts = <<MAPACCOUNTS
-- "${local.id}"
-MAPACCOUNTS
-  }
-  provider = kubernetes.demo
-}
-
 resource "aws_cloudwatch_log_group" "cluster" {
   # Reference: https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html
   name              = "/aws/eks/${local.name}/cluster"
@@ -92,14 +73,28 @@ resource "aws_subnet" "current" {
   count = length(local.availability_zones)
 
   availability_zone       = local.availability_zones[count.index]
-  cidr_block              = "10.0.${count.index * 16}.0/20"
+  cidr_block              = "10.0.${count.index}.0/24" # Create 3 adjacent /24 subnets (i.e. 256 addresses each) for the control plane components
   map_public_ip_on_launch = true
   vpc_id                  = one(aws_vpc.current[*].id)
 
   tags = {
     Name = "${local.name}-${local.availability_zones[count.index]}"
-    # https://aws.amazon.com/premiumsupport/knowledge-center/eks-vpc-subnet-discovery/
+    # The following tag is needed for EKS as described here: https://aws.amazon.com/premiumsupport/knowledge-center/eks-vpc-subnet-discovery/
     "kubernetes.io/cluster/${local.name}" = "shared"
+  }
+}
+
+resource "aws_subnet" "nodes" {
+  count = length(local.availability_zones)
+
+  availability_zone       = local.availability_zones[count.index]
+  cidr_block              = "10.0.${(count.index + 1) * 16}.0/20" # Create 3 adjacent /20 subnets (i.e. 4,096 addresses each) for the node groups
+  map_public_ip_on_launch = true
+  vpc_id                  = one(aws_vpc.current[*].id)
+  tags = {
+    Name = "${local.name}-nodes-${local.availability_zones[count.index]}"
+    # The following tag is needed for EKS as described here: https://aws.amazon.com/premiumsupport/knowledge-center/eks-vpc-subnet-discovery/
+    "kubernetes.io/cluster/${local.name}" = "shared" # https://aws.amazon.com/premiumsupport/knowledge-center/eks-vpc-subnet-discovery/
   }
 }
 
@@ -123,6 +118,22 @@ resource "aws_route_table_association" "current" {
   route_table_id = one(aws_route_table.current[*].id)
   subnet_id      = aws_subnet.current[count.index].id
 }
+
+# resource "aws_route_table_association" "nodes" {
+# # count = length(local.availability_zones)
+# for_each = { for subnet in aws_subnet.nodes[*] : subnet.id => subnet }
+
+# route_table_id = one(aws_route_table.current[*].id)
+# subnet_id      = each.key #aws_subnet.nodes[count.index].id
+# }
+
+# resource "aws_route_table_association" "extra" {
+# # for_each       = aws_subnet.nodes
+# for_each = { for subnet in aws_subnet.current[*] : subnet.id => subnet }
+
+# route_table_id = one(aws_route_table.current[*].id)
+# subnet_id      = each.value.id
+# }
 
 resource "aws_security_group" "control_plane" {
   description = "Cluster communication with worker nodes."
@@ -201,7 +212,8 @@ resource "aws_key_pair" "demo" {
 resource "aws_eks_node_group" "ng" {
   # all instances in node group should be the same instance type, or at least have the same vCPU and memory resources.
   # see: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
-  for_each        = { for subnet in aws_subnet.current[*] : subnet.id => subnet }
+  # for_each        = aws_subnet.nodes
+  for_each        = { for subnet in aws_subnet.nodes[*] : subnet.id => subnet }
   ami_type        = "AL2_x86_64" # or AL2_x86_64_GPU
   capacity_type   = "SPOT"
   cluster_name    = aws_eks_cluster.current.name
@@ -235,13 +247,13 @@ resource "aws_eks_node_group" "ng" {
     ignore_changes = [scaling_config[0].desired_size]
   }
 
-  # Force the node group to depend on aws-auth configmap; otherwise it gets created automatically and we have to import it
   # TODO: Also ensure that IAM Role permissions are created before and deleted after EKS Node Group handling,
   # otherwise, EKS will not be able to properly delete EC2 Instances and Elastic Network Interfaces.
   depends_on = [
     aws_iam_role_policy_attachment.control_plane_cluster_policy,
     aws_eks_cluster.current,
-    kubernetes_config_map.aws_auth,
+    # Force the node group to depend on aws-auth configmap; otherwise it gets created automatically and we have to import it
+    # kubernetes_config_map.aws_auth,
   ]
 }
 

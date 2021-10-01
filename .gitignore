@@ -6,9 +6,5 @@
 *.tfstate.*
 tfstate
 
-apply-output.txt
-plan-output.txt
-tfplan
-
 # Other
 .envrc

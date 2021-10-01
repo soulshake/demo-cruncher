@@ -67,7 +67,7 @@ automountServiceAccountToken: true
 kind: ServiceAccount
 metadata:
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::731288958074:role/demo-queue-watcher-production
+    eks.amazonaws.com/role-arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/demo-queue-watcher-production
   labels:
     app: queue-watcher
   name: queue-watcher
@@ -85,7 +85,7 @@ roleRef:
 subjects:
 - apiGroup: rbac.authorization.k8s.io
   kind: User
-  name: arn:aws:iam::731288958074:role/demo-queue-watcher-production
+  name: arn:aws:iam::${AWS_ACCOUNT_ID}:role/demo-queue-watcher-production
   namespace: production
 - kind: ServiceAccount
   name: queue-watcher
@@ -115,7 +115,7 @@ spec:
         - name: MAX_PENDING
           value: "20"
         - name: QUEUE_URL
-          value: https://sqs.eu-central-1.amazonaws.com/731288958074/production
+          value: https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/production
         image: nixery.dev/shell/awscli2/gettext/jq/kubectl
         imagePullPolicy: IfNotPresent
         resources:
