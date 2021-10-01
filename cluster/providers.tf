@@ -22,17 +22,7 @@ data "aws_region" "current" {}
 ###
 ### aws provider
 ###
-provider "aws" {
-  default_tags {
-    tags = {
-      cluster   = "demo"
-      repo_dir  = basename(abspath(path.root))
-      terraform = true
-      workspace = terraform.workspace
-    }
-  }
-  # no assume_role here; credentials are set via environment variables to avoid Terraform+MFA problems
-}
+provider "aws" {}
 
 ###
 ### k8s providers

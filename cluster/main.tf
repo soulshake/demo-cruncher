@@ -126,7 +126,7 @@ resource "aws_route_table_association" "nodes" {
 
 resource "aws_security_group" "control_plane" {
   description = "Cluster communication with worker nodes."
-  name        = local.name
+  name        = "${local.name}-security-group"
   vpc_id      = aws_vpc.current.id
 
   egress {

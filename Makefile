@@ -25,7 +25,7 @@ help: ## Displays help for each commented make recipe
 
 .PHONY: kubectl-apply
 kubectl-apply:
-	NAMESPACE=$${WORKSPACE} envsubst '$${AWS_ACCOUNT_ID},$${AWS_REGION},$${NAMESPACE}' < queue-watcher.yaml | kubectl apply -f -
+	NAMESPACE=$${TF_WORKSPACE} envsubst '$${AWS_ACCOUNT_ID},$${AWS_REGION},$${NAMESPACE}' < queue-watcher.yaml | kubectl apply -f -
 
 .PHONY: show-env
 show-env: ## Emit the values of the environment variables we care about
@@ -33,7 +33,7 @@ show-env: ## Emit the values of the environment variables we care about
 	echo "AWS_REGION=$${AWS_REGION:-}"
 	echo
 	echo "# Needed for running messages.sh; must match the Terraform workspace in ./app:"
-	echo "WORKSPACE=$${WORKSPACE:-}"
+	echo "TF_WORKSPACE=$${TF_WORKSPACE:-}"
 
 .PHONY: docs
 docs:

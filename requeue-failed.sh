@@ -5,7 +5,7 @@
 set -euo pipefail
 shopt -s inherit_errexit
 
-QUEUE_URL=https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/${WORKSPACE}
+QUEUE_URL=https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/${TF_WORKSPACE}
 
 retry_failed_jobs() {
     local all_failed failed_count job task name

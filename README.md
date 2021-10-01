@@ -41,9 +41,9 @@ Ensure the following environment variables are set:
 
 - `AWS_REGION`
 - `AWS_ACCOUNT_ID`
-- `WORKSPACE=production` (or another value of your choice)
+- `TF_WORKSPACE=production` (or another value of your choice)
 
-Note: the value of `WORKSPACE` will determine the names of:
+Note: the value of `TF_WORKSPACE` will determine the names of:
 - the Kubernetes namespace
 - the IAM roles, policies, and queue created in `./app/`
 
@@ -55,7 +55,6 @@ In `./cluster/`:
 
 ```
 terraform init
-terraform workspace new demo                     # note: the cluster will be given the same name as the workspace
 terraform apply -target aws_eks_cluster.current
 terraform plan
 terraform apply
@@ -87,7 +86,6 @@ In `./app/`:
 
 ```
 terraform init
-terraform workspace new "${WORKSPACE}"
 terraform plan
 terraform apply
 ```
@@ -97,7 +95,7 @@ terraform apply
 In the repo root, run:
 
 ```
-NAMESPACE=${WORKSPACE} envsubst '${AWS_ACCOUNT_ID},${AWS_REGION},${NAMESPACE}' < queue-watcher.yaml | kubectl apply -f -
+NAMESPACE=${TF_WORKSPACE} envsubst '${AWS_ACCOUNT_ID},${AWS_REGION},${NAMESPACE}' < queue-watcher.yaml | kubectl apply -f -
 ```
 
 ### Interact with the demo app
@@ -105,8 +103,7 @@ NAMESPACE=${WORKSPACE} envsubst '${AWS_ACCOUNT_ID},${AWS_REGION},${NAMESPACE}' <
 Update your kube config:
 
 ```
-kubectl config set-context demo --namespace "${WORKSPACE}"
-# ^ WORKSPACE should match the Terraform workspace used in ./app
+kubectl config set-context demo --namespace "${TF_WORKSPACE}"
 ```
 
 Add some messages to the queue (ensure `AWS_REGION` and `AWS_ACCOUNT_ID` are set):
@@ -169,7 +166,7 @@ To remove all resources:
 In the repo root:
 
 ```
-NAMESPACE=${WORKSPACE} envsubst '${AWS_ACCOUNT_ID},${AWS_REGION},${NAMESPACE}' < queue-watcher.yaml | kubectl delete -f -
+NAMESPACE=${TF_WORKSPACE} envsubst '${AWS_ACCOUNT_ID},${AWS_REGION},${NAMESPACE}' < queue-watcher.yaml | kubectl delete -f -
 ```
 
 In `./app/`:
