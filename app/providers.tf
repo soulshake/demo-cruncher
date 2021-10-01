@@ -5,14 +5,6 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 3.60.0"
     }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.5.0"
-    }
-    tls = {
-      source  = "hashicorp/tls"
-      version = "~> 3.1.0"
-    }
   }
 }
 
@@ -33,7 +25,7 @@ provider "aws" {
 }
 
 ###
-### k8s providers
+### k8s auth
 ###
 
 data "aws_eks_cluster" "demo" {
@@ -42,14 +34,4 @@ data "aws_eks_cluster" "demo" {
 
 data "aws_eks_cluster_auth" "demo" {
   name = data.aws_eks_cluster.demo.name
-}
-
-provider "kubernetes" {
-  host = "all-k8s-resources-must-specify-a-provider"
-}
-provider "kubernetes" {
-  alias                  = "demo"
-  host                   = data.aws_eks_cluster.demo.endpoint
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.demo.certificate_authority.0.data)
-  token                  = data.aws_eks_cluster_auth.demo.token
 }

@@ -1,0 +1,183 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-utils
+data:
+  utils.sh: |-
+    red='\033[0;31m'
+    yellow='\033[0;33m'
+    green='\033[0;32m'
+    blue='\033[0;34m'
+    purple='\033[0;35m'
+    inverted='\e[7m'
+    reset='\033[0m'
+    log() { printf >&2 "%b\n" "$*"; }
+    log_debug() { if [ -n "${DEBUG:-}" ]; then log "${blue}🐞${FILENAME:-} ${*}${reset}"; fi; }
+    log_verbose() { log "${purple}ℹ️${FILENAME:-} ${*}${reset}"; }
+    log_success() { log "${green}✓${FILENAME:-} ${*}${reset}"; }
+    log_warning() { log "${yellow}⚠️ ${FILENAME:-} ${*}${reset}"; }
+    log_error() { log "${red}✘ ${*}${reset}"; }
+    log_critical() { log "${red}${inverted}✘ ${*}${reset}"; }
+
+  job.yaml: |-
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      generateName: demo-
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          annotations:
+            task: '${TASK}'
+          labels:
+            app: demo-pipeline
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: cruncher-pipeline
+            image: nixery.dev/shell/iputils/jq
+            imagePullPolicy: IfNotPresent
+            command:
+            - sh
+            - -c
+            - |
+              set -euo pipefail
+              echo "TASK: ${TASK}"
+              # Note: we use single quotes here; the TASK variable is expanded by envsubst and already contains double quotes
+              duration=$(echo '${TASK}' | jq -r .duration)
+              target=$(echo '${TASK}' | jq -r .target)
+              timeout=$(( duration + 30 ))
+              echo "Pinging ${target} for ${duration} seconds!"
+              ping -w "${duration}" "${target}"
+              echo "All done!"
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "100Mi"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+---
+apiVersion: v1
+automountServiceAccountToken: true
+kind: ServiceAccount
+metadata:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::731288958074:role/demo-queue-watcher-production
+  labels:
+    app: queue-watcher
+  name: queue-watcher
+  namespace: production
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: edit-production
+  namespace: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: arn:aws:iam::731288958074:role/demo-queue-watcher-production
+  namespace: production
+- kind: ServiceAccount
+  name: queue-watcher
+  namespace: production
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: queue-watcher
+  name: queue-watcher
+  namespace: production
+spec:
+  selector:
+    matchLabels:
+      app: queue-watcher
+  template:
+    metadata:
+      labels:
+        app: queue-watcher
+    spec:
+      serviceAccount: queue-watcher
+      terminationGracePeriodSeconds: 2
+      containers:
+      - name: queue-watcher
+        env:
+        - name: MAX_PENDING
+          value: "20"
+        - name: QUEUE_URL
+          value: https://sqs.eu-central-1.amazonaws.com/731288958074/production
+        image: nixery.dev/shell/awscli2/gettext/jq/kubectl
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 500m
+            memory: 500Mi
+        command:
+          - bash
+          - -c
+          - |
+            set -euo pipefail
+            shopt -s inherit_errexit
+            . /utils/utils.sh
+
+            MAX_PENDING=${MAX_PENDING:-} # If set, never create more than MAX_PENDING jobs.
+            JOB_YAML_PATH=${JOB_YAML_PATH:-/utils/job.yaml}
+            : "${QUEUE_URL?Please set the QUEUE_URL environment variable.}"
+
+            kickoff_job() {
+                local job task=${1}
+                log_verbose "Kicking off job with task: ${1}"
+                job=$(TASK=${task} envsubst '${TASK}' <"${JOB_YAML_PATH}")
+                echo "${job}" | kubectl create -f -
+            }
+
+            pop_message() {
+                local body messages msg receipt_handle
+                messages=$(aws sqs receive-message --max-number-of-messages 1 --attribute-names All --wait-time-seconds 10 --queue-url "${QUEUE_URL}")
+                [ -z "${messages}" ] && log_debug "No messages received" && return
+                log_verbose "Message(s) received:"
+                echo "${messages}"
+                msg=$(echo "$messages" | jq '.Messages[0]')
+                body=$(echo "${msg}" | jq -r .Body)
+                receipt_handle=$(echo "${msg}" | jq -r '.ReceiptHandle')
+                kickoff_job "${body}" || return 1
+                echo -n "Deleting message... "
+                aws sqs delete-message --queue-url "${QUEUE_URL}" --receipt-handle "${receipt_handle}"
+                log_success "Message deleted."
+            }
+
+            # Continuously poll the queue and create a Kubernetes job for each message
+            log_verbose "starting watcher with QUEUE_URL '${QUEUE_URL}'..."
+            while sleep 1; do
+
+                # Hold off if there are already too many pending pods.
+                if [ -n "${MAX_PENDING}" ] \
+                    && pending_pod_count=$(kubectl get --no-headers pods --selector=app=demo-pipeline --field-selector=status.phase=Pending | wc -l) \
+                    && [ "${pending_pod_count}" -ge "${MAX_PENDING}" ]; then
+
+                    log_warning "Too many pending pods (${pending_pod_count}) in relation to MAX_PENDING (${MAX_PENDING}). Chilling a bit."
+                    sleep 10 && continue
+                fi
+
+                # Otherwise, pop from the queue.
+                pop_message
+            done
+        volumeMounts:
+        - name: utils-volume
+          mountPath: /utils/
+          readOnly: true
+      volumes:
+      - name: utils-volume
+        configMap:
+          defaultMode: 0600
+          name: my-utils

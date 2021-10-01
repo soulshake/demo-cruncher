@@ -25,53 +25,16 @@ reset='\033[0m'
 
 export red yellow lightyellow green blue cyan purple white dim inverted bold boldoff underline underlineoff reset
 
-maybe_log() {
-    NEWLINE='\n'
-    [ -n "${NL+1}" ] && NEWLINE="$NL"
-    printf >&2 "%b${NEWLINE}" "$*"
-    unset NL NEWLINE
-}
-
-function log() {
-    maybe_log "${*}"
-}
-
-log_debug() {
-    if [ -n "${DEBUG:-}" ]; then
-        maybe_log "${blue}🐞${FILENAME:-} ${*}${reset}"
-    fi
-}
-
-log_verbose() {
-    maybe_log "${purple}ℹ️${FILENAME:-} ${*}${reset}"
-}
-
-log_success() {
-    maybe_log "${green}✓${FILENAME:-} ${*}${reset}"
-}
-
-log_announce() {
-    maybe_log "${cyan}💬${inverted}${FILENAME:-} ${*}${reset}"
-}
-
-log_notice() {
-    maybe_log "${cyan}💬${FILENAME:-} ${*}${reset}"
-}
-
-log_warning() {
-    (
-        set +x
-        maybe_log "${yellow}⚠️ ${FILENAME:-} ${*}${reset}"
-    )
-}
-
-log_error() {
-    maybe_log "${red}✘ ${*}${reset}"
-}
-
-log_critical() {
-    maybe_log "${red}${inverted}✘ ${*}${reset}"
-}
+maybe_log() { printf >&2 "%b\n" "$*"; }
+function log() { maybe_log "${*}"; }
+log_debug() { if [ -n "${DEBUG:-}" ]; then maybe_log "${blue}🐞${FILENAME:-} ${*}${reset}"; fi; }
+log_verbose() { maybe_log "${purple}ℹ️${FILENAME:-} ${*}${reset}"; }
+log_success() { maybe_log "${green}✓${FILENAME:-} ${*}${reset}"; }
+log_announce() { maybe_log "${cyan}💬${inverted}${FILENAME:-} ${*}${reset}"; }
+log_notice() { maybe_log "${cyan}💬${FILENAME:-} ${*}${reset}"; }
+log_warning() { maybe_log "${yellow}⚠️ ${FILENAME:-} ${*}${reset}"; }
+log_error() { maybe_log "${red}✘ ${*}${reset}"; }
+log_critical() { maybe_log "${red}${inverted}✘ ${*}${reset}"; }
 
 confirm() {
     [ "${CI:-}" = true ] && return 1

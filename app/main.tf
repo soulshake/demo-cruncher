@@ -1,6 +1,6 @@
 /*
  * This directory contains everything needed to run one instantiation of the demo app.
- * Each Terraform workspace corresponds to a Kubernetes namespace, a dedicated SQS queue and `queue-watcher` deployment, and IAM roles with permissions scoped to these resources.
+ * Each Terraform workspace corresponds to a dedicated SQS queue and IAM roles with permissions scoped to these resources.
  * For example, to create a `staging` and `production` environment, you could run:
  *
  * ```
@@ -13,86 +13,17 @@
  * make apply
  * ```
  *
+ * Note: the names of the Kubernetes namespace and Terraform workspace must match.
  */
-
-variable "max_pending" {
-  default     = 10
-  description = "Maximum number of pending pods to tolerate before we stop creating new jobs."
-  type        = number
-}
 
 locals {
   id          = data.aws_caller_identity.current.account_id
-  namespace   = "demo-${terraform.workspace}"
   oidc_issuer = replace(data.aws_eks_cluster.demo.identity[0].oidc[0].issuer, "https://", "")
-  region      = data.aws_region.current.name
-
-  queue_watcher_labels = {
-    app = "queue-watcher"
-  }
 }
 
 # SQS queue
 resource "aws_sqs_queue" "queue" {
-  name = local.namespace
-}
-
-# Kubernetes resources
-resource "kubernetes_namespace" "ns" {
-  metadata {
-    name = local.namespace
-  }
-  provider = kubernetes.demo
-}
-
-resource "kubernetes_deployment" "queue_watcher" {
-  wait_for_rollout = false
-
-  metadata {
-    name      = "queue-watcher"
-    namespace = kubernetes_namespace.ns.metadata.0.name
-    labels    = local.queue_watcher_labels
-    annotations = {
-      "cluster-autoscaler.kubernetes.io/safe-to-evict" = true
-    }
-  }
-
-  spec {
-    selector {
-      match_labels = local.queue_watcher_labels
-    }
-
-    template {
-      metadata {
-        labels = local.queue_watcher_labels
-      }
-
-      spec {
-        service_account_name            = kubernetes_service_account.queue_watcher.metadata.0.name
-        automount_service_account_token = true
-        container {
-          image             = "${local.id}.dkr.ecr.${local.region}.amazonaws.com/queue-watcher:${terraform.workspace}"
-          image_pull_policy = "Always"
-          name              = "queue-watcher"
-          env {
-            name  = "MAX_PENDING"
-            value = var.max_pending
-          }
-          env {
-            name  = "QUEUE_URL"
-            value = aws_sqs_queue.queue.url
-          }
-          resources {
-            requests = {
-              cpu    = "500m"
-              memory = "500Mi"
-            }
-          }
-        }
-      }
-    }
-  }
-  provider = kubernetes.demo
+  name = terraform.workspace
 }
 
 # Roles
@@ -117,7 +48,7 @@ data "aws_iam_policy_document" "assume_role_with_oidc" {
       test     = "StringEquals"
       variable = "${local.oidc_issuer}:sub"
       values = [
-        "system:serviceaccount:${local.namespace}:queue-watcher",
+        "system:serviceaccount:${terraform.workspace}:queue-watcher",
       ]
     }
   }
@@ -149,49 +80,6 @@ data "aws_iam_policy_document" "queue_watcher" {
 resource "aws_iam_role_policy_attachment" "queue_watcher" {
   role       = aws_iam_role.queue_watcher.name
   policy_arn = aws_iam_policy.queue_watcher.arn
-}
-
-resource "kubernetes_service_account" "queue_watcher" {
-  automount_service_account_token = true
-  metadata {
-    name      = "queue-watcher"
-    namespace = kubernetes_namespace.ns.metadata.0.name
-    labels    = local.queue_watcher_labels
-    annotations = {
-      "eks.amazonaws.com/role-arn" : aws_iam_role.queue_watcher.arn
-    }
-  }
-  provider = kubernetes.demo
-}
-
-# Role bindings
-#
-resource "kubernetes_role_binding" "queue_watcher" {
-  # Needs to be able to create pods
-  metadata {
-    name      = "edit-${local.namespace}"
-    namespace = kubernetes_namespace.ns.metadata.0.name
-  }
-  role_ref {
-    api_group = "rbac.authorization.k8s.io"
-    kind      = "ClusterRole"
-    name      = "edit"
-  }
-  subject {
-    # associates the iam role with the corresponding k8s "user" even if no mapping is present in aws-auth configmap
-    kind      = "User"
-    name      = aws_iam_role.queue_watcher.arn
-    api_group = "rbac.authorization.k8s.io"
-    namespace = kubernetes_namespace.ns.metadata.0.name
-  }
-  # allows this service account to run `kubectl create`
-  subject {
-    kind      = "ServiceAccount"
-    name      = kubernetes_service_account.queue_watcher.metadata.0.name
-    api_group = ""
-    namespace = kubernetes_namespace.ns.metadata.0.name
-  }
-  provider = kubernetes.demo
 }
 
 # Outputs
