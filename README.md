@@ -34,6 +34,7 @@ Each Terraform workspace corresponds to a dedicated SQS queue and IAM roles with
 
 - Terraform
 - AWS CLI
+- `envsubst` (typically found in package `gettext`)
 - `jq`
 - `make` (optional)
 
@@ -94,7 +95,7 @@ terraform apply
 
 #### Deploy the K8s resources
 
-In the repo root:
+In the repo root, run `make kubectl-apply`, or:
 
 ```
 NAMESPACE=${WORKSPACE} envsubst '${AWS_ACCOUNT_ID},${AWS_REGION},${NAMESPACE}' < queue-watcher.yaml | kubectl apply -f -
