@@ -5,15 +5,17 @@
 set -euo pipefail
 shopt -s inherit_errexit
 
-QUEUE_URL=https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/demo-${WORKSPACE}
+QUEUE_URL=https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/${WORKSPACE}
 
 retry_failed_jobs() {
     local all_failed failed_count job task name
+    echo "Note: once requeued, failed jobs will be immediately deleted."
 
     all_failed=$(kubectl get job -o=jsonpath='{.items[?(@.status.conditions[].type=="Failed")]}' | jq --slurp)
     failed_count=$(jq '. | length' <<<"${all_failed}")
 
-    echo -e "${failed_count} job(s) to requeue. Note: once requeued, failed jobs will be immediately deleted.\n"
+    current_ns=$(kubectl config view -o jsonpath='{.contexts[].context.namespace}')
+    echo "${failed_count} job(s) to requeue in namespace '${current_ns}'."
 
     for i in $(seq 0 "$((failed_count - 1))"); do
         job=$(echo "${all_failed}" | jq -r '.['"${i}"']')
