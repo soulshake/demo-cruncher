@@ -62,7 +62,13 @@ terraform apply
 aws eks update-kubeconfig --name demo
 ```
 
+#### Options
+
+##### Public key for node access
+
 To be able to connect to nodes, set `TF_VAR_public_key` to the desired public key (in OpenSSH format), then plan/apply.
+
+##### Availability zones
 
 Node groups are created in the 3 standard AWS availability zones (`abc`) by default. To change this, set your desired AZs like so:
 
