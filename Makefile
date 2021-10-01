@@ -23,9 +23,9 @@ help: ## Displays help for each commented make recipe
 	# bold everything following the last occurrence of ':' on each line
 	echo "$${x}" | sed "s/\(.*\):/\1:`tput bold`/" | sed "s/$$/`tput sgr0`/"
 
-###
-### Environment
-###
+.PHONY: kubectl-apply
+kubectl-apply:
+	NAMESPACE=$${WORKSPACE} envsubst '$${AWS_ACCOUNT_ID},$${AWS_REGION},$${NAMESPACE}' < queue-watcher.yaml | kubectl apply -f -
 
 .PHONY: env
 env: ## Emit the values of the environment variables we care about

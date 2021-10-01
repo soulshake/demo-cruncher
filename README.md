@@ -112,7 +112,7 @@ kubectl config set-context demo --namespace "${WORKSPACE}"
 Add some messages to the queue (ensure `AWS_REGION` and `AWS_ACCOUNT_ID` are set):
 
 ```
-./messages.sh --add 1
+./messages.sh --add 10
 ```
 
 The values of `TARGET` and `DURATION` environment variables affect the resulting queue messages:

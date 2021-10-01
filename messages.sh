@@ -11,8 +11,8 @@ add_messages() {
     local count target duration msg
     count=${1:-1}
     target=${TARGET:-goo.gl}
-    duration=${DURATION:-30}
-    echo "Adding ${count} message(s), using target '${target}' and duration '${duration}'. Set TARGET or DURATION environment variables to override these values."
+    duration=${DURATION:-60}
+    echo "Adding ${count} message(s), using target '${target}' and duration '${duration}' (ish). Set TARGET or DURATION environment variables to override these values."
     for i in $(seq 1 "${count}"); do
         duration=$((duration + i)) # use slightly different durations, for funsies
         msg='{ "target": "'"${target}"'", "duration": "'"${duration}"'" }'
@@ -39,6 +39,13 @@ show_jobs() {
         kubectl get jobs --selector="${SELECTOR}"
     )
     echo
+}
+
+show_failed_jobs() {
+    local failed
+    echo "Failed jobs:"
+    failed=$(kubectl get job -o=jsonpath='{.items[?(@.status.conditions[].type=="Failed")]}' | jq --slurp)
+    echo "$failed" | jq -r '.[].metadata.name'
 }
 
 purge_queue() {
@@ -79,6 +86,7 @@ main() {
     -s | --show)
         show_queue
         show_jobs
+        show_failed_jobs
         ;;
     *)
         usage
