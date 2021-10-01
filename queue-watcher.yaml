@@ -9,7 +9,6 @@ data:
     yellow='\033[0;33m'
     green='\033[0;32m'
     blue='\033[0;34m'
-    cyan='\033[0;36m'
     purple='\033[0;35m'
     inverted='\e[7m'
     reset='\033[0m'
@@ -17,8 +16,6 @@ data:
     log_debug() { if [ -n "${DEBUG:-}" ]; then log "${blue}🐞${FILENAME:-} ${*}${reset}"; fi; }
     log_verbose() { log "${purple}ℹ️${FILENAME:-} ${*}${reset}"; }
     log_success() { log "${green}✓${FILENAME:-} ${*}${reset}"; }
-    log_announce() { log "${cyan}💬${inverted}${FILENAME:-} ${*}${reset}"; }
-    log_notice() { log "${cyan}💬${FILENAME:-} ${*}${reset}"; }
     log_warning() { log "${yellow}⚠️ ${FILENAME:-} ${*}${reset}"; }
     log_error() { log "${red}✘ ${*}${reset}"; }
     log_critical() { log "${red}${inverted}✘ ${*}${reset}"; }
