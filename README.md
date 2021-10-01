@@ -44,8 +44,9 @@ Ensure the following environment variables are set:
 - `TF_WORKSPACE=production` (or another value of your choice)
 
 Note: the value of `TF_WORKSPACE` will determine the names of:
-- the Kubernetes namespace
-- the IAM roles, policies, and queue created in `./app/`
+- the Kubernetes cluster and associated AWS resources (VPC, etc) defined in `./cluster/`
+- the IAM roles, policies, and queue defined in `./app/`
+- the name of the Kubernetes namespace, deployment, service account, etc defined in `queue-watcher.yaml`
 
 Run `make show-env` to show the current values of these variables.
 
@@ -58,10 +59,11 @@ terraform init
 terraform apply -target aws_eks_cluster.current
 terraform plan
 terraform apply
-aws eks update-kubeconfig --name demo
+aws eks update-kubeconfig --name "${TF_WORKSPACE}"
 ```
 
-#### Options
+<details>
+<summary>Options</summary>
 
 ##### Public key for node access
 
@@ -77,6 +79,8 @@ terraform plan
 ```
 
 Warning: due to particularities of the Terraform Kubernetes provider, changing values that result in cluster replacement (e.g. changing the value of `var.availability_zones`) after the cluster resources have been created will cause errors regarding Helm resources during planning. In this case, do a targeted apply first, like: `terraform apply -target aws_eks_cluster.current`.
+
+</details>
 
 ### Instantiate the demo app
 
