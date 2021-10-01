@@ -10,6 +10,18 @@ A `queue-watcher` deployment is created, which monitors an SQS queue. When messa
 
 If more resources are needed, the cluster autoscaler kicks in to add more nodes.
 
+Failed jobs can be re-enqueued by running:
+
+```
+./requeue-failed.sh
+```
+
+This command:
+- finds all the jobs in the current namespace which have exceeded their backoff limit
+- extracts the original task from an annotation on the failed job
+- adds a new queue message for the task
+- deletes the failed job
+
 ## Summary of resources defined in this repo
 
 The `./demo-cluster` directory contains the definitions for an EKS cluster, node group, associated IAM roles/policies, etc. This directory need only be instantiated once.
@@ -26,7 +38,7 @@ make plan
 make apply
 ```
 
-Each Terraform workspace corresponds to a dedicated SQS queue and IAM roles with permissions scoped to these resources.
+Each Terraform workspace corresponds to a dedicated SQS queue and an IAM role with minimally scoped permissions. The `queue-watcher` deployment will run with a service account that assumes this IAM role via the cluster's OIDC provider, allowing it to retrieve messages from the SQS queue.
 
 ## Setup
 
