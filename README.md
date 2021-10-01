@@ -8,37 +8,13 @@ A `queue-watcher` deployment is created, which monitors an SQS queue. When messa
 - creates a Kubernetes job to process it
 - deletes the message from the queue
 
-If more resources are needed, the cluster autoscaler kicks in to add more nodes.
-
-Failed jobs can be re-enqueued by running:
-
-```
-./requeue-failed.sh
-```
-
-This command:
-- finds all the jobs in the current namespace which have exceeded their backoff limit
-- extracts the original task from an annotation on the failed job
-- adds a new queue message for the task
-- deletes the failed job
+If more resources are needed, the cluster autoscaler kicks in to add more nodes. Failed jobs can be requeued. For details, see below.
 
 ## Summary of resources defined in this repo
 
 The `./cluster` directory contains the definitions for an EKS cluster, node group, associated IAM roles/policies, etc. This directory need only be instantiated once.
 
-The `./app` directory contains everything needed to run one instantiation of the "app" on AWS. For example, to create a `staging` and `production` environment, you could run:
-
-```
-terraform init
-
-terraform workspace new staging
-terraform plan
-terraform apply
-
-terraform workspace new production
-terraform plan
-terraform apply
-```
+The `./app` directory contains everything needed to run one instantiation of the "app" on AWS.
 
 Each Terraform workspace corresponds to a dedicated SQS queue and an IAM role with minimally scoped permissions. The `queue-watcher` deployment will run with a service account that assumes this IAM role via the cluster's OIDC provider, allowing it to retrieve messages from the SQS queue.
 
@@ -112,7 +88,7 @@ terraform apply
 
 #### Deploy the K8s resources
 
-In the repo root, run `make kubectl-apply`, or:
+In the repo root, run:
 
 ```
 NAMESPACE=${WORKSPACE} envsubst '${AWS_ACCOUNT_ID},${AWS_REGION},${NAMESPACE}' < queue-watcher.yaml | kubectl apply -f -
@@ -148,6 +124,12 @@ To re-add failed tasks to the queue and delete the failed jobs, run:
 ```
 ./requeue-failed.sh
 ```
+
+This command:
+- finds all the jobs in the current namespace which have exceeded their backoff limit
+- extracts the original task from an annotation on the failed job
+- adds a new queue message for the task
+- deletes the failed job
 
 ### Reset jobs and queue
 
