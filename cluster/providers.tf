@@ -22,7 +22,9 @@ data "aws_region" "current" {}
 ###
 ### aws provider
 ###
-provider "aws" {}
+
+provider "aws" {
+}
 
 ###
 ### k8s providers
@@ -33,14 +35,6 @@ data "aws_eks_cluster_auth" "current" {
 }
 
 provider "helm" {
-  # Placeholder to ensure all helm resources have an explicit provider as well.
-  kubernetes {
-    host = "all-helm-resources-must-have-a-provider"
-  }
-}
-
-provider "helm" {
-  alias = "demo"
   kubernetes {
     host                   = aws_eks_cluster.current.endpoint
     cluster_ca_certificate = base64decode(aws_eks_cluster.current.certificate_authority.0.data)

@@ -41,7 +41,11 @@ Ensure the following environment variables are set:
 
 - `AWS_REGION`
 - `AWS_ACCOUNT_ID`
+<<<<<<< Updated upstream
 - `TF_WORKSPACE=production` (or another value of your choice)
+=======
+- `WORKSPACE=default`
+>>>>>>> Stashed changes
 
 Note: the value of `TF_WORKSPACE` will determine the names of:
 - the Kubernetes cluster and associated AWS resources (VPC, etc) defined in `./cluster/`
@@ -56,10 +60,18 @@ In `./cluster/`:
 
 ```
 terraform init
+<<<<<<< Updated upstream
 terraform apply -target aws_eks_cluster.current
 terraform plan
 terraform apply
 aws eks update-kubeconfig --name "${TF_WORKSPACE}"
+=======
+terraform plan
+terraform apply -target aws_eks_cluster.current # this takes approximately 10 minutes
+terraform plan
+terraform apply # this takes approximately 3 minutes
+aws eks update-kubeconfig --name $WORKSPACE
+>>>>>>> Stashed changes
 ```
 
 <details>
