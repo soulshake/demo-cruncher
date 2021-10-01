@@ -65,14 +65,15 @@ terraform workspace new demo
 terraform apply -target aws_eks_cluster.current
 terraform plan
 terraform apply
+aws eks update-kubeconfig --name demo
 ```
 
 To be able to connect to nodes, set `TF_VAR_public_key` to the desired public key (in OpenSSH format), then plan/apply.
 
-Node groups are created in the 3 standard AWS availability zones by default. To change this, set your desired AZs like so:
+Node groups are created in the 3 standard AWS availability zones (`abc`) by default. To change this, set your desired AZs like so:
 
 ```
-export TF_VAR_availability_zones='["g", "e", "f"]'
+export TF_VAR_availability_zones='["a", "b"]'
 make plan
 ```
 
@@ -96,7 +97,7 @@ terraform apply
 In the repo root:
 
 ```
-envsubst '${AWS_ACCOUNT_ID},${AWS_REGION}' < queue-watcher.yaml | kubectl apply -f -
+NAMESPACE=${WORKSPACE} envsubst '${AWS_ACCOUNT_ID},${AWS_REGION},${NAMESPACE}' < queue-watcher.yaml | kubectl apply -f -
 ```
 
 (TODO: replace hardcoded AWS account ID in `queue-watcher.yaml`)
@@ -106,7 +107,6 @@ envsubst '${AWS_ACCOUNT_ID},${AWS_REGION}' < queue-watcher.yaml | kubectl apply 
 Update your kube config:
 
 ```
-aws eks update-kubeconfig --name demo
 kubectl config set-context demo --namespace "${WORKSPACE}"
 # ^ WORKSPACE should match the Terraform workspace used in ./app
 ```

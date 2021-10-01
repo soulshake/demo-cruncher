@@ -3,6 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: my-utils
+  namespace: ${NAMESPACE}
 data:
   utils.sh: |-
     red='\033[0;31m'
@@ -60,24 +61,24 @@ data:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: production
+  name: ${NAMESPACE}
 ---
 apiVersion: v1
 automountServiceAccountToken: true
 kind: ServiceAccount
 metadata:
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/demo-queue-watcher-production
+    eks.amazonaws.com/role-arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/queue-watcher-${NAMESPACE}
   labels:
     app: queue-watcher
   name: queue-watcher
-  namespace: production
+  namespace: ${NAMESPACE}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: edit-production
-  namespace: production
+  name: edit
+  namespace: ${NAMESPACE}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -85,11 +86,11 @@ roleRef:
 subjects:
 - apiGroup: rbac.authorization.k8s.io
   kind: User
-  name: arn:aws:iam::${AWS_ACCOUNT_ID}:role/demo-queue-watcher-production
-  namespace: production
+  name: arn:aws:iam::${AWS_ACCOUNT_ID}:role/queue-watcher-${NAMESPACE}
+  namespace: ${NAMESPACE}
 - kind: ServiceAccount
   name: queue-watcher
-  namespace: production
+  namespace: ${NAMESPACE}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -97,7 +98,7 @@ metadata:
   labels:
     app: queue-watcher
   name: queue-watcher
-  namespace: production
+  namespace: ${NAMESPACE}
 spec:
   selector:
     matchLabels:
@@ -115,7 +116,7 @@ spec:
         - name: MAX_PENDING
           value: "20"
         - name: QUEUE_URL
-          value: https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/production
+          value: https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/${NAMESPACE}
         image: nixery.dev/shell/awscli2/gettext/jq/kubectl
         imagePullPolicy: IfNotPresent
         resources:
@@ -143,7 +144,7 @@ spec:
 
             pop_message() {
                 local body messages msg receipt_handle
-                messages=$(aws sqs receive-message --max-number-of-messages 1 --attribute-names All --wait-time-seconds 10 --queue-url "${QUEUE_URL}")
+                messages=$(aws sqs receive-message --queue-url "${QUEUE_URL}")
                 [ -z "${messages}" ] && log_debug "No messages received" && return
                 log_verbose "Message(s) received:"
                 echo "${messages}"

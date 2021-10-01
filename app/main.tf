@@ -28,7 +28,7 @@ resource "aws_sqs_queue" "queue" {
 
 # Roles
 resource "aws_iam_role" "queue_watcher" {
-  name               = "demo-queue-watcher-${terraform.workspace}"
+  name               = "queue-watcher-${terraform.workspace}"
   description        = "queue-watcher role for ${terraform.workspace}"
   assume_role_policy = trimspace(data.aws_iam_policy_document.assume_role_with_oidc.json)
 }

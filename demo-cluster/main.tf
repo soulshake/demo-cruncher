@@ -28,19 +28,25 @@ locals {
 resource "aws_eks_cluster" "current" {
   name                      = local.name
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
-  role_arn                  = one(aws_iam_role.control_plane[*].arn)
+  role_arn                  = aws_iam_role.roles["control-plane"].arn
   version                   = "1.21"
 
   vpc_config {
-    security_group_ids = [one(aws_security_group.control_plane[*].id)]
-    subnet_ids         = aws_subnet.current.*.id
+    security_group_ids = [aws_security_group.control_plane.id]
+    subnet_ids         = aws_subnet.cluster.*.id
   }
 
   depends_on = [
-    aws_cloudwatch_log_group.cluster,
+    aws_cloudwatch_log_group.cluster, # Otherwise it gets created automatically, causing a conflict
     aws_iam_role_policy_attachment.control_plane_cluster_policy,
-    aws_subnet.nodes
+    aws_subnet.nodes,
   ]
+}
+
+resource "aws_cloudwatch_log_group" "cluster" {
+  # Reference: https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html
+  name              = "/aws/eks/${local.name}/cluster"
+  retention_in_days = 30
 }
 
 data "tls_certificate" "cluster" {
@@ -58,24 +64,18 @@ resource "aws_iam_openid_connect_provider" "default" {
   }
 }
 
-resource "aws_cloudwatch_log_group" "cluster" {
-  # Reference: https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html
-  name              = "/aws/eks/${local.name}/cluster"
-  retention_in_days = 30
-}
-
 # Networking
 resource "aws_vpc" "current" {
   cidr_block = "10.0.0.0/16"
 }
 
-resource "aws_subnet" "current" {
+resource "aws_subnet" "cluster" {
   count = length(local.availability_zones)
 
   availability_zone       = local.availability_zones[count.index]
   cidr_block              = "10.0.${count.index}.0/24" # Create 3 adjacent /24 subnets (i.e. 256 addresses each) for the control plane components
   map_public_ip_on_launch = true
-  vpc_id                  = one(aws_vpc.current[*].id)
+  vpc_id                  = aws_vpc.current.id
 
   tags = {
     Name = "${local.name}-${local.availability_zones[count.index]}"
@@ -90,7 +90,7 @@ resource "aws_subnet" "nodes" {
   availability_zone       = local.availability_zones[count.index]
   cidr_block              = "10.0.${(count.index + 1) * 16}.0/20" # Create 3 adjacent /20 subnets (i.e. 4,096 addresses each) for the node groups
   map_public_ip_on_launch = true
-  vpc_id                  = one(aws_vpc.current[*].id)
+  vpc_id                  = aws_vpc.current.id
   tags = {
     Name = "${local.name}-nodes-${local.availability_zones[count.index]}"
     # The following tag is needed for EKS as described here: https://aws.amazon.com/premiumsupport/knowledge-center/eks-vpc-subnet-discovery/
@@ -99,46 +99,35 @@ resource "aws_subnet" "nodes" {
 }
 
 resource "aws_internet_gateway" "current" {
-  vpc_id = one(aws_vpc.current[*].id)
+  vpc_id = aws_vpc.current.id
 }
 
 resource "aws_route_table" "current" {
-  vpc_id = one(aws_vpc.current[*].id)
+  vpc_id = aws_vpc.current.id
 }
 
 resource "aws_route" "current" {
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = one(aws_internet_gateway.current[*].id)
-  route_table_id         = one(aws_route_table.current[*].id)
+  gateway_id             = aws_internet_gateway.current.id
+  route_table_id         = aws_route_table.current.id
 }
 
 resource "aws_route_table_association" "current" {
-  count = length(local.availability_zones)
-
-  route_table_id = one(aws_route_table.current[*].id)
-  subnet_id      = aws_subnet.current[count.index].id
+  count          = length(local.availability_zones)
+  route_table_id = aws_route_table.current.id
+  subnet_id      = aws_subnet.cluster[count.index].id
 }
 
-# resource "aws_route_table_association" "nodes" {
-# # count = length(local.availability_zones)
-# for_each = { for subnet in aws_subnet.nodes[*] : subnet.id => subnet }
-
-# route_table_id = one(aws_route_table.current[*].id)
-# subnet_id      = each.key #aws_subnet.nodes[count.index].id
-# }
-
-# resource "aws_route_table_association" "extra" {
-# # for_each       = aws_subnet.nodes
-# for_each = { for subnet in aws_subnet.current[*] : subnet.id => subnet }
-
-# route_table_id = one(aws_route_table.current[*].id)
-# subnet_id      = each.value.id
-# }
+resource "aws_route_table_association" "nodes" {
+  count          = length(local.availability_zones)
+  route_table_id = aws_route_table.current.id
+  subnet_id      = aws_subnet.nodes[count.index].id
+}
 
 resource "aws_security_group" "control_plane" {
   description = "Cluster communication with worker nodes."
   name        = local.name
-  vpc_id      = one(aws_vpc.current[*].id)
+  vpc_id      = aws_vpc.current.id
 
   egress {
     from_port   = 0
@@ -153,50 +142,9 @@ resource "aws_security_group_rule" "control_plane_ingress_apiserver_public" {
   description       = "Allow public internet access to cluster API Server."
   from_port         = 443
   protocol          = "tcp"
-  security_group_id = one(aws_security_group.control_plane[*].id)
+  security_group_id = aws_security_group.control_plane.id
   to_port           = 443
   type              = "ingress"
-}
-
-###
-### Autoscaling
-###
-
-resource "helm_release" "cluster_autoscaler" {
-  # https://github.com/kubernetes/autoscaler/tree/master/charts/cluster-autoscaler
-  # https://docs.aws.amazon.com/prescriptive-guidance/latest/containers-provision-eks-clusters-terraform/helm-add-ons.html
-  chart            = "cluster-autoscaler"
-  create_namespace = true
-  name             = "cluster-autoscaler"
-  namespace        = "cluster-autoscaler"
-  repository       = "https://kubernetes.github.io/autoscaler"
-  wait             = false
-
-  set {
-    name  = "awsRegion"
-    value = local.region
-  }
-  set {
-    name  = "autoDiscovery.clusterName"
-    value = aws_eks_cluster.current.name
-  }
-  provider = helm.demo
-}
-
-###
-### Metrics server
-###
-
-resource "helm_release" "metrics_server" {
-  # https://github.com/kubernetes-sigs/metrics-server/blob/master/charts/metrics-server/README.md
-  chart            = "metrics-server"
-  create_namespace = true
-  name             = "metrics-server"
-  namespace        = "metrics-server"
-  repository       = "https://kubernetes-sigs.github.io/metrics-server/"
-  wait             = false
-
-  provider = helm.demo
 }
 
 ###
@@ -204,8 +152,8 @@ resource "helm_release" "metrics_server" {
 ###
 
 # Public key for SSH access to nodes
-resource "aws_key_pair" "demo" {
-  key_name   = "demo-key"
+resource "aws_key_pair" "current" {
+  key_name   = "${local.name}-key"
   public_key = var.public_key
 }
 
@@ -220,7 +168,7 @@ resource "aws_eks_node_group" "ng" {
   disk_size       = 50
   instance_types  = ["t3.medium"]
   node_group_name = "${terraform.workspace}-normal-${replace(each.value.availability_zone, local.region, "")}"
-  node_role_arn   = aws_iam_role.node.arn
+  node_role_arn   = aws_iam_role.roles["node"].arn
   subnet_ids      = [each.value.id]
 
   labels = {
@@ -230,7 +178,7 @@ resource "aws_eks_node_group" "ng" {
   }
 
   remote_access {
-    ec2_ssh_key = aws_key_pair.demo.key_name
+    ec2_ssh_key = aws_key_pair.current.key_name
   }
 
   scaling_config {
@@ -250,18 +198,77 @@ resource "aws_eks_node_group" "ng" {
   # TODO: Also ensure that IAM Role permissions are created before and deleted after EKS Node Group handling,
   # otherwise, EKS will not be able to properly delete EC2 Instances and Elastic Network Interfaces.
   depends_on = [
-    aws_iam_role_policy_attachment.control_plane_cluster_policy,
     aws_eks_cluster.current,
-    # Force the node group to depend on aws-auth configmap; otherwise it gets created automatically and we have to import it
-    # kubernetes_config_map.aws_auth,
+    aws_iam_role_policy_attachment.cluster_node_iam_role_attachment,
+    aws_iam_role_policy_attachment.control_plane_cluster_policy,
   ]
 }
 
 ###
 ### Node permissions
 ###
+
+# Control plane and node roles
+resource "aws_iam_role" "roles" {
+  for_each = {
+    control-plane : "eks"
+    node : "ec2"
+  }
+  name = "${local.name}-${each.key}"
+
+  assume_role_policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "${each.value}.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+POLICY
+}
+
+resource "aws_iam_role_policy_attachment" "control_plane_cluster_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.roles["control-plane"].name
+}
+
+resource "aws_iam_role_policy_attachment" "control_plane_service_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
+  role       = aws_iam_role.roles["control-plane"].name
+}
+
+resource "aws_iam_role_policy_attachment" "node_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.roles["node"].name
+}
+
+resource "aws_iam_role_policy_attachment" "node_cni_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.roles["node"].name
+}
+
+resource "aws_iam_role_policy_attachment" "node_container_registry_ro" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.roles["node"].name
+}
+
+resource "aws_iam_role_policy_attachment" "node_plus_cloudwatch_agent" {
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+  role       = aws_iam_role.roles["node"].name
+}
+
+resource "aws_iam_role_policy_attachment" "cluster_node_iam_role_attachment" {
+  policy_arn = aws_iam_policy.cluster_node_policy.arn
+  role       = aws_iam_role.roles["node"].name
+}
+
 resource "aws_iam_policy" "cluster_node_policy" {
-  name   = "demo-node"
+  name   = "${local.name}-node"
   policy = data.aws_iam_policy_document.cluster_node_policy_doc.json
 }
 
@@ -298,82 +305,39 @@ data "aws_iam_policy_document" "cluster_node_policy_doc" {
     ]
   }
 }
+###
+### Autoscaling
+###
 
-# Control plane role
-resource "aws_iam_role" "control_plane" {
-  name = "demo-control-plane"
+resource "helm_release" "cluster_autoscaler" {
+  # https://github.com/kubernetes/autoscaler/tree/master/charts/cluster-autoscaler
+  # https://docs.aws.amazon.com/prescriptive-guidance/latest/containers-provision-eks-clusters-terraform/helm-add-ons.html
+  chart            = "cluster-autoscaler"
+  create_namespace = true
+  name             = "cluster-autoscaler"
+  namespace        = "cluster-autoscaler"
+  repository       = "https://kubernetes.github.io/autoscaler"
+  wait             = false
 
-  assume_role_policy = <<POLICY
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "eks.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-POLICY
-}
-
-# Worker roles
-resource "aws_iam_role" "node" {
-  name = "demo-node"
-
-  assume_role_policy = <<POLICY
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "ec2.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-POLICY
+  set {
+    name  = "awsRegion"
+    value = local.region
+  }
+  set {
+    name  = "autoDiscovery.clusterName"
+    value = aws_eks_cluster.current.name
+  }
+  provider = helm.demo
 }
 
-resource "aws_iam_role_policy_attachment" "cluster_node_iam_role_attachment" {
-  policy_arn = one(aws_iam_policy.cluster_node_policy[*].arn)
-  role       = aws_iam_role.node.name
-}
+resource "helm_release" "metrics_server" {
+  # https://github.com/kubernetes-sigs/metrics-server/blob/master/charts/metrics-server/README.md
+  chart            = "metrics-server"
+  create_namespace = true
+  name             = "metrics-server"
+  namespace        = "metrics-server"
+  repository       = "https://kubernetes-sigs.github.io/metrics-server/"
+  wait             = false
 
-resource "aws_iam_role_policy_attachment" "node_plus_cloudwatch_agent" {
-  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
-  role       = aws_iam_role.node.name
-}
-
-resource "aws_iam_role_policy_attachment" "control_plane_cluster_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-  role       = one(aws_iam_role.control_plane[*].name)
-}
-
-resource "aws_iam_role_policy_attachment" "control_plane_service_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
-  role       = one(aws_iam_role.control_plane[*].name)
-}
-
-resource "aws_iam_role_policy_attachment" "node_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-  role       = one(aws_iam_role.node[*].name)
-}
-
-resource "aws_iam_role_policy_attachment" "node_cni_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = one(aws_iam_role.node[*].name)
-}
-
-resource "aws_iam_role_policy_attachment" "node_container_registry_ro" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-  role       = one(aws_iam_role.node[*].name)
-}
-
-resource "aws_ecr_repository" "queue-watcher" {
-  name = "queue-watcher"
+  provider = helm.demo
 }
