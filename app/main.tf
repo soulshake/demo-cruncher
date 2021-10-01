@@ -19,7 +19,6 @@
 locals {
   id          = data.aws_caller_identity.current.account_id
   oidc_issuer = replace(data.aws_eks_cluster.demo.identity[0].oidc[0].issuer, "https://", "")
-  region      = data.aws_region.current.name
 }
 
 # SQS queue
