@@ -77,7 +77,7 @@ In `./cluster/`:
 
 ```
 terraform init
-terraform workspace new demo # the cluster will be given the same name as the workspace
+terraform workspace new demo                     # note: the cluster will be given the same name as the workspace
 terraform apply -target aws_eks_cluster.current
 terraform plan
 terraform apply
