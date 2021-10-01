@@ -63,8 +63,11 @@ Ensure the following environment variables are set:
 
 - `AWS_REGION`
 - `AWS_ACCOUNT_ID`
-- `MAKEFILES=../Makefile` (to be able to run `make` in subdirectories)
 - `WORKSPACE=production` (or another value of your choice)
+
+The value of `WORKSPACE` will determine the names of:
+- the Kubernetes namespace
+- the IAM roles, policies, and queue created in `./app/`
 
 Run `make env` to show the current values of these variables.
 
@@ -74,7 +77,7 @@ In `./demo-cluster/`:
 
 ```
 terraform init
-terraform workspace new demo
+terraform workspace new demo # the cluster will be given the same name as the workspace
 terraform apply -target aws_eks_cluster.current
 terraform plan
 terraform apply
