@@ -29,13 +29,15 @@ The `./cluster` directory contains the definitions for an EKS cluster, node grou
 The `./app` directory contains everything needed to run one instantiation of the "app" on AWS. For example, to create a `staging` and `production` environment, you could run:
 
 ```
+terraform init
+
 terraform workspace new staging
-make plan
-make apply
+terraform plan
+terraform apply
 
 terraform workspace new production
-make plan
-make apply
+terraform plan
+terraform apply
 ```
 
 Each Terraform workspace corresponds to a dedicated SQS queue and an IAM role with minimally scoped permissions. The `queue-watcher` deployment will run with a service account that assumes this IAM role via the cluster's OIDC provider, allowing it to retrieve messages from the SQS queue.
@@ -90,10 +92,10 @@ Node groups are created in the 3 standard AWS availability zones (`abc`) by defa
 
 ```
 export TF_VAR_availability_zones='["a", "b"]'
-make plan
+terraform plan
 ```
 
-Warning: due to particularities of the Terraform Kubernetes provider, changing values that result in cluster replacement (e.g. changing the value of `var.availability_zones`) after the cluster resources have been created will cause errors regarding Helm resources during planning. In this case, do a targeted apply first, like: `make plan TARGET=aws_eks_cluster.current`, `make apply`.
+Warning: due to particularities of the Terraform Kubernetes provider, changing values that result in cluster replacement (e.g. changing the value of `var.availability_zones`) after the cluster resources have been created will cause errors regarding Helm resources during planning. In this case, do a targeted apply first, like: `terraform apply -target aws_eks_cluster.current`.
 
 ### Instantiate the demo app
 

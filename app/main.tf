@@ -5,12 +5,12 @@
  *
  * ```
  * terraform workspace new staging
- * make plan
- * make apply
+ * terraform plan
+ * terraform apply
  *
  * terraform workspace new production
- * make plan
- * make apply
+ * terraform plan
+ * terraform apply
  * ```
  *
  * Note: the names of the Kubernetes namespace and Terraform workspace must match.

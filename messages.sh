@@ -26,19 +26,17 @@ add_messages() {
 }
 
 show_queue() {
-    (
-        set -x
-        aws sqs get-queue-attributes --queue-url "${QUEUE_URL}" --attribute-names QueueArn ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
-    )
+    local -
+    echo
+    set -x
+    aws sqs get-queue-attributes --queue-url "${QUEUE_URL}" --attribute-names QueueArn ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible
 }
 
 show_jobs() {
+    local -
     echo
-    (
-        set -x
-        kubectl get jobs --selector="${SELECTOR}"
-    )
-    echo
+    set -x
+    kubectl get jobs --selector="${SELECTOR}"
 }
 
 show_failed_jobs() {
@@ -49,20 +47,19 @@ show_failed_jobs() {
 }
 
 purge_queue() {
+    local -
     echo "Purging queue ${QUEUE_URL}..."
     show_queue
-    (
-        set -x
-        aws sqs purge-queue --queue-url "${QUEUE_URL}"
-    )
-    echo "Queue purged"
+    set -x
+    aws sqs purge-queue --queue-url "${QUEUE_URL}"
 }
 
 purge_jobs() {
+    local -
     echo "Purging all jobs matching selector: ${SELECTOR} ..."
     show_jobs
+    set -x
     kubectl delete jobs --selector="${SELECTOR}"
-    echo "Jobs purged."
 }
 
 usage() {
@@ -80,8 +77,8 @@ main() {
         add_messages "$@"
         ;;
     -p | --purge)
-        purge_queue
-        purge_jobs
+        purge_queue && echo "Queue purged."
+        purge_jobs && echo "Jobs purged."
         ;;
     -s | --show)
         show_queue

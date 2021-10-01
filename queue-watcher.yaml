@@ -33,6 +33,7 @@ data:
           annotations:
             task: '${TASK}'
           labels:
+            # note: if the value of `app` is changed, you'll also want to update the value of $SELECTOR in messages.sh.
             app: demo-pipeline
         spec:
           restartPolicy: Never
