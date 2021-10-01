@@ -113,8 +113,6 @@ spec:
       containers:
       - name: queue-watcher
         env:
-        - name: MAX_PENDING
-          value: "20"
         - name: QUEUE_URL
           value: https://sqs.${AWS_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/${NAMESPACE}
         image: nixery.dev/shell/awscli2/gettext/jq/kubectl
@@ -131,7 +129,6 @@ spec:
             shopt -s inherit_errexit
             . /utils/utils.sh
 
-            MAX_PENDING=${MAX_PENDING:-} # If set, never create more than MAX_PENDING jobs.
             JOB_YAML_PATH=${JOB_YAML_PATH:-/utils/job.yaml}
             : "${QUEUE_URL?Please set the QUEUE_URL environment variable.}"
 
@@ -160,17 +157,6 @@ spec:
             # Continuously poll the queue and create a Kubernetes job for each message
             log_verbose "starting watcher with QUEUE_URL '${QUEUE_URL}'..."
             while sleep 1; do
-
-                # Hold off if there are already too many pending pods.
-                if [ -n "${MAX_PENDING}" ] \
-                    && pending_pod_count=$(kubectl get --no-headers pods --selector=app=demo-pipeline --field-selector=status.phase=Pending | wc -l) \
-                    && [ "${pending_pod_count}" -ge "${MAX_PENDING}" ]; then
-
-                    log_warning "Too many pending pods (${pending_pod_count}) in relation to MAX_PENDING (${MAX_PENDING}). Chilling a bit."
-                    sleep 10 && continue
-                fi
-
-                # Otherwise, pop from the queue.
                 pop_message
             done
         volumeMounts:
