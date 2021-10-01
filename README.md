@@ -69,7 +69,7 @@ Note: the value of `WORKSPACE` will determine the names of:
 - the Kubernetes namespace
 - the IAM roles, policies, and queue created in `./app/`
 
-Run `make env` to show the current values of these variables.
+Run `make show-env` to show the current values of these variables.
 
 ### Create the cluster
 

@@ -27,11 +27,10 @@ help: ## Displays help for each commented make recipe
 kubectl-apply:
 	NAMESPACE=$${WORKSPACE} envsubst '$${AWS_ACCOUNT_ID},$${AWS_REGION},$${NAMESPACE}' < queue-watcher.yaml | kubectl apply -f -
 
-.PHONY: env
-env: ## Emit the values of the environment variables we care about
+.PHONY: show-env
+show-env: ## Emit the values of the environment variables we care about
 	@echo "AWS_ACCOUNT_ID=$${AWS_ACCOUNT_ID:-}"
 	echo "AWS_REGION=$${AWS_REGION:-}"
-	echo "MAKEFILES=$${MAKEFILES:-}"
 	echo
 	echo "# Needed for running messages.sh; must match the Terraform workspace in ./app:"
 	echo "WORKSPACE=$${WORKSPACE:-}"
