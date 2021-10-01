@@ -14,7 +14,7 @@ If more resources are needed, the cluster autoscaler kicks in to add more nodes.
 
 The `./demo-cluster` directory contains the definitions for an EKS cluster, node group, associated IAM roles/policies, etc. This directory need only be instantiated once.
 
-The `./app` directory contains everything needed to run one instantiation of the "app". For example, to create a `staging` and `production` environment, you could run:
+The `./app` directory contains everything needed to run one instantiation of the "app" on AWS. For example, to create a `staging` and `production` environment, you could run:
 
 ```
 terraform workspace new staging
@@ -26,7 +26,7 @@ make plan
 make apply
 ```
 
-Each Terraform workspace corresponds to a Kubernetes namespace, a dedicated SQS queue and `queue-watcher` deployment, and IAM roles with permissions scoped to these resources.
+Each Terraform workspace corresponds to a dedicated SQS queue and IAM roles with permissions scoped to these resources.
 
 ## Setup
 
@@ -37,7 +37,7 @@ Each Terraform workspace corresponds to a Kubernetes namespace, a dedicated SQS 
 - `jq`
 - `make`
 
-To install Terraform:
+To install Terraform to `/usr/local/bin/terraform`:
 
 ```
 make deps
@@ -78,23 +78,24 @@ To be able to connect to nodes, set `TF_VAR_public_key` to the desired public ke
 
 In `./app/`:
 
-#### Build and push queue-watcher image
-
-```
-export REGISTRY_SLASH=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-export COLON_TAG=:${WORKSPACE}
-aws ecr get-login-password | docker login --username AWS --password-stdin ${REGISTRY_SLASH}
-docker-compose build && docker-compose push
-```
-
-#### Deploy
+#### Deploy the AWS resources
 
 ```
 terraform init
-terraform workspace new ${WORKSPACE}
+terraform workspace new "${WORKSPACE}"
 make plan
 make apply
 ```
+
+#### Deploy the K8s resources
+
+In the repo root:
+
+```
+kubectl apply -f queue-watcher.yaml
+```
+
+(TODO: replace hardcoded AWS account ID in `queue-watcher.yaml`)
 
 ### Interact with the demo app
 
@@ -102,8 +103,8 @@ Update your kube config:
 
 ```
 aws eks update-kubeconfig --name demo
-kubectl config set-context demo --namespace ${WORKSPACE}
-# ^ WORKSPACE should match the Terraform workspace in ./app
+kubectl config set-context demo --namespace "${WORKSPACE}"
+# ^ WORKSPACE should match the Terraform workspace used in ./app
 ```
 
 Add some messages to the queue (ensure `AWS_REGION` and `AWS_ACCOUNT_ID` are set):
