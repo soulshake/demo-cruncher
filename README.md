@@ -290,9 +290,9 @@ aws sqs purge-queue --queue-url $QUEUE_URL
 
 When processing a message queue, it is common to have a "dead letter queue"
 where messages end up if they fail to be processed correctly. This gives us
-two strategies to manage retries.
+two strategies to manage retries:
 
-#### 1. Leverage SQS native dead letter queue.
+#### 1. Using an SQS deadletter queue
 
 With this approach, the consumer would receive messages from the queue, and it *would not* immediately delete them.
 
@@ -331,7 +331,7 @@ a "visibility timeout updater" process in parallel to the worker code. In this w
 messages whose processing has failed would reappear in the queue as soon as their visibility
 timeout has expired, so retries will happen relatively quickly.
 
-#### 2. Don't leverage SQS native dead letter queue.
+#### 2. Keeping track of failed Kubernetes jobs
 
 In this case, the consumer would receive messages from the queue,
 and for each message, it would submit a job to a batch processing
