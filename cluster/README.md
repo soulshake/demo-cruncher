@@ -14,7 +14,7 @@ This directory contains the definitions for an EKS cluster, node group, associat
 | Name | Version |
 |------|---------|
 | <a name="provider_aws"></a> [aws](#provider\_aws) | 3.60.0 |
-| <a name="provider_helm.demo"></a> [helm.demo](#provider\_helm.demo) | 2.3.0 |
+| <a name="provider_helm"></a> [helm](#provider\_helm) | 2.3.0 |
 | <a name="provider_tls"></a> [tls](#provider\_tls) | 3.1.0 |
 
 ## Modules
