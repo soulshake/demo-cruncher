@@ -35,13 +35,12 @@ Make sure that you have the required dependencies:
 
 Set the following environment variables:
 
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_DEFAULT_REGION`
-- `AWS_ACCOUNT_ID`
+- `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (unless your AWS CLI is already configured)
+- `AWS_REGION` (required)
+- `AWS_ACCOUNT_ID` (required)
 
 If you don't know your account ID, you can see it with `aws sts get-caller-identity`
-(after settings access key and secret access key environment variables).
+(after configuring the AWS CLI, i.e. by setting the access key and secret access key environment variables).
 
 Create the EKS cluster.
 
@@ -49,7 +48,7 @@ Create the EKS cluster.
 cd cluster
 terraform init
 terraform apply
-aws eks update-kubeconfig --name default
+aws eks update-kubeconfig --name default --alias default
 cd ..
 ```
 
@@ -58,8 +57,8 @@ Note: this usually takes at least 10-15 minutes to complete.
 Note: the name of the cluster (`default` in the example above) corresponds
 to the name of the Terraform workspace. If you want to deploy multiple
 clusters, you can change the Terraform workspace, and it should deploy
-another set of resources. You will also have to edit the cluster name
-in `queue/main.tf`.
+another set of resources. You will also have to set `TF_VAR_cluster` environment
+variable when running Terraform commands in the `queue` subdirectory.
 
 Create the SQS queue.
 
@@ -67,24 +66,18 @@ Create the SQS queue.
 cd queue
 terraform init
 terraform apply
+export QUEUE_URL=$(terraform output -raw queue_url)  # Important! We will use this in other commands below.
 cd ..
 ```
 
 This Terraform configuration creates an SQS queue and an IAM role with
 minimally scoped permissions.
 
-Note: the name of the Terraform workspace will be part of the queue
-URL, so if you want to create multiple queues, you can do so by changing
-the Terraform workspace. However, if you do that, you will need to adjust
-a few other manifests where the that value might be hardcoded.
-
-
-Set the following environment variable; we will use it in a lot of
-other commands below.
-
-```bash
-QUEUE_URL=https://sqs.${AWS_DEFAULT_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/${TF_WORKSPACE-default}
-```
+Note: the value of the `namespace` Terraform variable will be part of the queue
+URL, so if you want to create multiple queues, you can do so by setting
+the `TF_VAR_namespace` environment variable when running Terraform commands
+in the `queue` subdirectory. However, if you do that, you will
+need to adjust a few other manifests where that value might be hardcoded.
 
 Now, we need to start the `queue-watcher` controller. Normally, we would
 build+push an image with the code of that controller; but to simplify things
@@ -94,7 +87,7 @@ we don't have to rely on an external image or a registry.
 
 ```bash
 kubectl create configmap queue-watcher \
-        --from-file=queue-watcher \
+        --from-file=./controller \
         --from-literal=QUEUE_URL=$QUEUE_URL
 ```
 
@@ -119,7 +112,7 @@ aws sqs send-message --queue-url $QUEUE_URL \
     --message-body '{"target": "127.0.0.2", "duration": "20"}'
 ```
 
-Check that  jobs and pods and created...
+Check that jobs and pods are created...
 ```bash
 watch kubectl get jobs,pods
 ```
@@ -156,7 +149,6 @@ Look at the job status:
 
 ```bash
 kubectl get jobs -o custom-columns=NAME:metadata.name,COMMAND:spec.template.spec.containers[0].command,STATUS:status.conditions[0].type
-
 ```
 
 At some point, the "invalid" jobs will show a status of `Failed`.
@@ -223,9 +215,9 @@ zones, you may be able to get up to 9 nodes.
 You can also view AWS autoscaling activity:
 
 ```bash
-watch aws autoscaling describe-scaling-activities --output=table \
-      --query 'Activities | sort_by(@, &StartTime)[].
-              [StartTime,AutoScalingGroupName,Description,StatusCode]'
+watch "aws autoscaling describe-scaling-activities --output=table" \
+      "--query 'Activities | sort_by(@, &StartTime)[].
+              [StartTime,AutoScalingGroupName,Description,StatusCode]'"
 ```
 
 Normally, you should see a few nodes come up; and after all the

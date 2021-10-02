@@ -3,7 +3,7 @@
  */
 
 variable "public_key" {
-  default     = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKNEtKIF8/e84xCQJ9ay0XF0FWtpDiixqwTwlvvMxihv6zO7DgxFxmLSb1l621U0mKsRu7O5GRqPnUfv2ppEypnP/ifgxS9Ffc/AxbwtLdcjlZ3y3gCC/lvUs7pbw/zJTNFS1lC5e5xrzpCXiGmG14LtTAC2Y+BnFedk4xAIL1T1BiEJfl6+l8JY4gk6yKhmLcExOFvlHnVZupxYYriuK3XmvKN/6ndj5fc3IrGtQEoQPXZi9kBbtQB9qluFKHcP3Xv6EJwc1DDFXSxxK6hjOYq4T4cHQEgBYB4HMrYD/00BXHWJvcCxdy025DrHoyUEKYYOl41U2ydLXwBN/WxFPN aj@soulshake.net"
+  default     = null
   description = "Public key to provision on nodes."
 }
 
@@ -152,6 +152,7 @@ resource "aws_security_group_rule" "control_plane_ingress_apiserver_public" {
 
 # Public key for SSH access to nodes
 resource "aws_key_pair" "current" {
+  count      = var.public_key != null ? 1 : 0
   key_name   = "${local.name}-key"
   public_key = var.public_key
 }
@@ -174,7 +175,7 @@ resource "aws_eks_node_group" "ng" {
   }
 
   remote_access {
-    ec2_ssh_key = aws_key_pair.current.key_name
+    ec2_ssh_key = one(aws_key_pair.current[*].key_name)
   }
 
   scaling_config {
@@ -304,6 +305,10 @@ data "aws_iam_policy_document" "cluster_node_policy_doc" {
 ###
 ### Autoscaling
 ###
+
+# NOTE: It's generally discouraged to define Kubernetes resources in the same Terraform configuration where the cluster itself is defined.
+# We do it anyway to simplify getting up and running, but you may run into issues if you tweak things here.
+# For details, see: https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs#stacking-with-managed-kubernetes-cluster-resources
 
 resource "helm_release" "cluster_autoscaler" {
   # https://github.com/kubernetes/autoscaler/tree/master/charts/cluster-autoscaler

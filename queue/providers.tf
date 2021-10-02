@@ -21,10 +21,10 @@ provider "aws" {}
 ### k8s auth
 ###
 
-data "aws_eks_cluster" "default" {
-  name = "default"
+data "aws_eks_cluster" "current" {
+  name = var.cluster
 }
 
-data "aws_eks_cluster_auth" "default" {
-  name = data.aws_eks_cluster.default.name
+data "aws_eks_cluster_auth" "current" {
+  name = data.aws_eks_cluster.current.name
 }
