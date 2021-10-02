@@ -73,7 +73,7 @@ cd ..
 This Terraform configuration creates an SQS queue and an IAM role with
 minimally scoped permissions.
 
-Note: the value of the `namespace` variable will be part of the queue
+Note: the value of the `namespace` Terraform variable will be part of the queue
 URL, so if you want to create multiple queues, you can do so by setting
 the `TF_VAR_namespace` environment variable when running Terraform commands
 in the `queue` subdirectory. However, if you do that, you will
