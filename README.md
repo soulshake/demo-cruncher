@@ -326,12 +326,13 @@ If jobs are not really time-sensitive, and they all take roughly the same amount
 option `a` is sufficient: the visibility timeout can be set in the `receive-message`
 request directly, or just after (e.g. via `aws sqs change-message-visibility`).
 
-If jobs must be processed as quickly as possible, and you don't want a failed message
-to have to reach the default visibility timeout before being retried, option `b` would
-be necessary. This would require either adding some logic to the worker code, or running
-a "visibility timeout updater" process in parallel to the worker code. In this way,
-messages whose processing has failed would reappear in the queue as soon as their visibility
-timeout has expired, so retries will happen relatively quickly.
+If jobs must be processed as quickly as possible, or have variable processing times, or
+you don't want a failed message to have to reach the default visibility timeout before
+being retried, option `b` would be necessary. This would require either adding some
+logic to the worker code, or running a "visibility timeout updater" process in parallel
+to the worker code. In this way, messages whose processing has failed would reappear in
+the queue as soon as their visibility timeout has expired, so retries will happen
+relatively quickly.
 
 #### 2. Keeping track of failed Kubernetes jobs
 
