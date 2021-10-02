@@ -41,7 +41,7 @@ spec:
           valueFrom:
             configMapKeyRef:
               name: queue-watcher
-              key: QUEUE_URL              
+              key: QUEUE_URL
         image: nixery.dev/shell/awscli2/gettext/jq/kubectl
         resources:
           requests:
