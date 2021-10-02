@@ -304,8 +304,8 @@ With this approach, the consumer would receive messages from the queue, and it *
 - If the consumer needs more than 30 seconds to process the message, it can change the
   *visibility* of the message (essentially telling the queue "I need more time to work
   on this; do not make that message visible to other consumers yet").
-- If the consumer fails to change the visibility of the message, the message becomes
-  visible again, and can be received by another consumer.
+- If the consumer fails to change the visibility of the message before the timeout, the
+  message becomes visible again, and can be received by another consumer.
 - If a message is received too many times (according to the `maxReceiveCount` queue
   attribute), it eventually gets moved to the dead letter queue, where it can be
   inspected to figure out why nobody was able to process it.
@@ -319,7 +319,7 @@ for purely stateless queue consumers.
 
 If the messages need a lot of processing time, the consumers need to either:
 
-  a) know in advance, how long it will take to process it, or
+  a) know in advance how long it will take to process a message, or <br/>
   b) set a short visibility timeout initially, and then regularly push back the timeout while processing is still underway.
 
 If jobs are not really time-sensitive, and they all take roughly the same amount of time,
