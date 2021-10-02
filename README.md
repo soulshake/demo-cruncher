@@ -289,8 +289,10 @@ aws sqs purge-queue --queue-url $QUEUE_URL
 ## Discussion on failed job management
 
 When processing a message queue, it is common to have a "dead letter queue"
-where messages end up if they fail to be processed correctly. This gives us
-two strategies to manage retries:
+where messages end up if they fail to be processed correctly. But there are
+some downsides to this.
+
+We see two main strategies to manage retries:
 
 #### 1. Using an SQS deadletter queue
 
