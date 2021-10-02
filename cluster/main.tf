@@ -26,10 +26,9 @@ locals {
 ###
 
 resource "aws_eks_cluster" "current" {
-  name                      = local.name
-  enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
-  role_arn                  = aws_iam_role.roles["control-plane"].arn
-  version                   = "1.21"
+  name     = local.name
+  role_arn = aws_iam_role.roles["control-plane"].arn
+  version  = "1.21"
 
   vpc_config {
     security_group_ids = [aws_security_group.control_plane.id]
@@ -158,22 +157,19 @@ resource "aws_key_pair" "current" {
 }
 
 resource "aws_eks_node_group" "ng" {
-  # all instances in node group should be the same instance type, or at least have the same vCPU and memory resources.
-  # see: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
-  # for_each        = aws_subnet.nodes
-  for_each        = { for subnet in aws_subnet.nodes[*] : subnet.id => subnet }
-  ami_type        = "AL2_x86_64" # or AL2_x86_64_GPU
+  count           = length(var.availability_zones)
+  ami_type        = "AL2_x86_64"
   capacity_type   = "SPOT"
   cluster_name    = aws_eks_cluster.current.name
   disk_size       = 50
   instance_types  = ["t3.medium"]
-  node_group_name = "${local.name}-normal-${replace(each.value.availability_zone, local.region, "")}"
+  node_group_name = "${local.name}-normal-${replace(var.availability_zones[count.index], local.region, "")}"
   node_role_arn   = aws_iam_role.roles["node"].arn
-  subnet_ids      = [each.value.id]
+  subnet_ids      = [aws_subnet.nodes[count.index].id]
 
   labels = {
     spot   = true
-    az     = each.value.availability_zone
+    az     = var.availability_zones[count.index]
     region = local.region
   }
 
@@ -188,7 +184,7 @@ resource "aws_eks_node_group" "ng" {
   }
 
   tags = {
-    Name = "${local.name}-normal-${replace(each.value.availability_zone, local.region, "")}"
+    Name = "${local.name}-normal-${replace(var.availability_zones[count.index], local.region, "")}"
   }
 
   lifecycle {
@@ -337,4 +333,6 @@ resource "helm_release" "metrics_server" {
   namespace        = "metrics-server"
   repository       = "https://kubernetes-sigs.github.io/metrics-server/"
   wait             = false
+
+  depends_on = [aws_eks_cluster.current]
 }

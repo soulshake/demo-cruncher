@@ -48,7 +48,6 @@ Create the EKS cluster.
 ```bash
 cd cluster
 terraform init
-terraform apply -target aws_eks_cluster.current
 terraform apply
 aws eks update-kubeconfig --name default
 cd ..
@@ -72,7 +71,7 @@ cd ..
 ```
 
 This Terraform configuration creates an SQS queue and an IAM role with
-minimally scoped permissions. 
+minimally scoped permissions.
 
 Note: the name of the Terraform workspace will be part of the queue
 URL, so if you want to create multiple queues, you can do so by changing
@@ -132,7 +131,7 @@ aws sqs get-queue-attributes --queue-url $QUEUE_URL --attribute-names All
 
 Completed jobs can be removed like this:
 ```bash
-kubectl get jobs 
+kubectl get jobs
   -o=jsonpath='{.items[?(@.status.conditions[].type=="Complete")].metadata.name}' |
   xargs kubectl delete jobs
 ```

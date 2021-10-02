@@ -19,16 +19,7 @@ terraform {
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-###
-### aws provider
-###
-
-provider "aws" {
-}
-
-###
-### k8s providers
-###
+provider "aws" {}
 
 data "aws_eks_cluster_auth" "current" {
   name = aws_eks_cluster.current.name

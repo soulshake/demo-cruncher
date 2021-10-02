@@ -15,15 +15,7 @@ data "aws_region" "current" {}
 ### aws provider
 ###
 
-provider "aws" {
-  default_tags {
-    tags = {
-      repo_dir  = basename(abspath(path.root))
-      terraform = true
-      workspace = terraform.workspace
-    }
-  }
-}
+provider "aws" {}
 
 ###
 ### k8s auth
