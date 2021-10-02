@@ -1,0 +1,61 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/queue-watcher-default
+  name: queue-watcher
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: edit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit
+subjects:
+- kind: ServiceAccount
+  name: queue-watcher
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: queue-watcher
+  name: queue-watcher
+spec:
+  selector:
+    matchLabels:
+      app: queue-watcher
+  template:
+    metadata:
+      labels:
+        app: queue-watcher
+    spec:
+      serviceAccount: queue-watcher
+      containers:
+      - name: queue-watcher
+        env:
+        - name: QUEUE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: queue-watcher
+              key: QUEUE_URL              
+        image: nixery.dev/shell/awscli2/gettext/jq/kubectl
+        resources:
+          requests:
+            cpu: 500m
+            memory: 500Mi
+        workingDir: /app
+        command:
+        - sh
+        - ./queue-watcher.sh
+        volumeMounts:
+        - name: app
+          mountPath: /app/
+          readOnly: true
+      volumes:
+      - name: app
+        configMap:
+          name: queue-watcher

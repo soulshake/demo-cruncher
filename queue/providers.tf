@@ -14,6 +14,7 @@ data "aws_region" "current" {}
 ###
 ### aws provider
 ###
+
 provider "aws" {
   default_tags {
     tags = {
@@ -28,10 +29,10 @@ provider "aws" {
 ### k8s auth
 ###
 
-data "aws_eks_cluster" "demo" {
-  name = "demo"
+data "aws_eks_cluster" "default" {
+  name = "default"
 }
 
-data "aws_eks_cluster_auth" "demo" {
-  name = data.aws_eks_cluster.demo.name
+data "aws_eks_cluster_auth" "default" {
+  name = data.aws_eks_cluster.default.name
 }

@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: demo-
+  annotations:
+    task: |
+      $task
+spec:
+  # The default is 6. With the default exponential backoff timers,
+  # it means at least 7-8 minutes for a job to fail 6 times.
+  # Let's lower this for demo purposes (so that jobs fail faster).
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: ping
+        image: alpine
+        command:
+        - ping
+        - -w
+        - $duration
+        - $target
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "100Mi"

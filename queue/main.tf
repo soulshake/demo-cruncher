@@ -1,24 +1,6 @@
-/*
- * This directory contains everything needed to run one instantiation of the demo app.
- * Each Terraform workspace corresponds to a dedicated SQS queue and IAM roles with permissions scoped to these resources.
- * For example, to create a `staging` and `production` environment, you could run:
- *
- * ```
- * terraform workspace new staging
- * terraform plan
- * terraform apply
- *
- * terraform workspace new production
- * terraform plan
- * terraform apply
- * ```
- *
- * Note: the names of the Kubernetes namespace and Terraform workspace must match.
- */
-
 locals {
   id          = data.aws_caller_identity.current.account_id
-  oidc_issuer = replace(data.aws_eks_cluster.demo.identity[0].oidc[0].issuer, "https://", "")
+  oidc_issuer = replace(data.aws_eks_cluster.default.identity[0].oidc[0].issuer, "https://", "")
 }
 
 # SQS queue
