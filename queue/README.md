@@ -1,19 +1,3 @@
-This directory contains everything needed to run one instantiation of the demo app.
-Each Terraform workspace corresponds to a dedicated SQS queue and IAM roles with permissions scoped to these resources.
-For example, to create a `staging` and `production` environment, you could run:
-
-```
-terraform workspace new staging
-terraform plan
-terraform apply
-
-terraform workspace new production
-terraform plan
-terraform apply
-```
-
-Note: the names of the Kubernetes namespace and Terraform workspace must match.
-
 ## Requirements
 
 | Name | Version |
