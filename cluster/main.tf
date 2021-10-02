@@ -304,6 +304,7 @@ data "aws_iam_policy_document" "cluster_node_policy_doc" {
     ]
   }
 }
+
 ###
 ### Autoscaling
 ###
@@ -326,7 +327,6 @@ resource "helm_release" "cluster_autoscaler" {
     name  = "autoDiscovery.clusterName"
     value = aws_eks_cluster.current.name
   }
-  provider = helm.demo
 }
 
 resource "helm_release" "metrics_server" {
@@ -337,6 +337,4 @@ resource "helm_release" "metrics_server" {
   namespace        = "metrics-server"
   repository       = "https://kubernetes-sigs.github.io/metrics-server/"
   wait             = false
-
-  provider = helm.demo
 }
