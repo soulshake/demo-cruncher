@@ -294,33 +294,46 @@ two strategies to manage retries.
 
 #### 1. Leverage SQS native dead letter queue.
 
-In that case, the consumer would receive messages from the queue, and it
-*would not* delete messages from the queue. When a message is received from
-the queue, it becomes invisible to other consumers for a short period of time
-(default is 30 seconds). When the consumer has processed the message, it
-deletes the message. If the consumer needs more than 30 seconds to process the
-message, it can change the *visibility* of the message (essentially telling
-the queue "I need more time to work on this; do not make that message visible
-to other consumers yet"). If the consumer fails to change the visibility of the
-message, the message becomes visible again, and can be received by another
-consumer. If a message is received too many times (according to the `maxReceiveCount`
-queue attribute), it eventually gets moved to the dead letter queue, where
-it can be inspected to figure out why nobody was able to process it.
+With this approach, the consumer would receive messages from the queue, and it *would not* immediately delete them.
 
-The advantage of this method is that it doesn't require storing message
-state anywhere else than in SQS. This is well-suited for purely stateless
-queue consumers.
+- When a message is received from the queue, it becomes invisible to other consumers
+  for a short period of time (default is 30 seconds).
+- When the consumer has processed the message, it deletes the message.
+- If the consumer needs more than 30 seconds to process the message, it can change the
+  *visibility* of the message (essentially telling the queue "I need more time to work
+  on this; do not make that message visible to other consumers yet").
+- If the consumer fails to change the visibility of the message, the message becomes
+  visible again, and can be received by another consumer.
+- If a message is received too many times (according to the `maxReceiveCount` queue
+  attribute), it eventually gets moved to the dead letter queue, where it can be
+  inspected to figure out why nobody was able to process it.
 
-The downside of this method is that if the messages need a lot of processing
-time, the consumers need to either a) specify, at the moment when they retrieve the
-message, how long it will take to process it, or b) regularly update the message
-visibility timeout while processing is still underway.
-This requires either adding some logic to the worker code, or running a
-"visibility timeout updater" process in parallel to the worker code.
+##### Advantages
+
+It doesn't require storing message state anywhere else than in SQS. This is well-suited
+for purely stateless queue consumers.
+
+##### Downsides
+
+If the messages need a lot of processing time, the consumers need to either:
+
+  a) know in advance, how long it will take to process it, or
+  b) set a short visibility timeout initially, and then regularly push back the timeout while processing is still underway.
+
+If jobs are not really time-sensitive, and they all take roughly the same amount of time,
+option `a` is sufficient: the visibility timeout can be set in the `receive-message`
+request directly, or just after (e.g. via `aws sqs change-message-visibility`).
+
+If jobs must be processed as quickly as possible, and you don't want a failed message
+to have to reach the default visibility timeout before being retried, option `b` would
+be necessary. This would require either adding some logic to the worker code, or running
+a "visibility timeout updater" process in parallel to the worker code. In this way,
+messages whose processing has failed would reappear in the queue as soon as their visibility
+timeout has expired, so retries will happen relatively quickly.
 
 #### 2. Don't leverage SQS native dead letter queue.
 
-In that case, the consumer would receive messages from the queue,
+In this case, the consumer would receive messages from the queue,
 and for each message, it would submit a job to a batch processing
 system (in our case, Kubernetes is the batch processing system),
 and immediately delete it from the queue.
@@ -332,20 +345,17 @@ Job with a "Failed" condition.)
 The advantage of this method is that the worker code doesn't need
 to be aware of SQS and the message visibility timeouts.
 
-The downside of this method is that it requires that our batch
-processing system offers durability for jobs; i.e. that when
-we submit a job, it won't disappear if it fails, and that we can
-store alongside the job enough information to recreate it or
-put it back in the queue if it fails.
+The downside of this method is that it requires that:
+- our batch processing system persists failed jobs
+- we can store enough information in the job's metadata to recreate it or put it back in the queue if it fails.
 
 **Which one is best?**
 
 They both have merits. In a system where Kubernetes is only one
 of many consumers for the queue, or where Kubernetes clusters are
 considered to be ephemeral, it would be better to leverage the SQS
-dead letter queue. In a system that would be "Kubernetes-centric,"
-or potentially using multiple queues, or trying to be agnostic
-to the type of queue used, it would be better to not leverage the
-SQS queue.
+dead letter queue. In a "Kubernetes-centric" system, or potentially
+when using multiple queues, or trying to be agnostic to the type of queue
+used, it would be better to not leverage the SQS queue.
 
 YMMV.
