@@ -342,11 +342,15 @@ dead letter queue; instead, it ends up showing an error state
 in our batch processing system. (In our case, that's a Kubernetes
 Job with a "Failed" condition.)
 
-The advantage of this method is that the worker code doesn't need
-to be aware of SQS and the message visibility timeouts.
+##### Advantages
 
-The downside of this method is that it requires that:
-- our batch processing system persists failed jobs
+The worker code doesn't need to be aware of SQS and the message visibility timeouts.
+
+##### Downsides
+
+This method requires that:
+
+- our batch processing system persists failed jobs (i.e. failed jobs aren't automatically deleted)
 - we can store enough information in the job's metadata to recreate it or put it back in the queue if it fails.
 
 **Which one is best?**
