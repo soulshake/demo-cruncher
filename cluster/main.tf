@@ -305,6 +305,10 @@ data "aws_iam_policy_document" "cluster_node_policy_doc" {
 ### Autoscaling
 ###
 
+# NOTE: It's generally discouraged to define Kubernetes resources in the same Terraform configuration where the cluster itself is defined.
+# We do it anyway to simplify getting up and running, but you may run into issues if you tweak things here.
+# For details, see: https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs#stacking-with-managed-kubernetes-cluster-resources
+
 resource "helm_release" "cluster_autoscaler" {
   # https://github.com/kubernetes/autoscaler/tree/master/charts/cluster-autoscaler
   # https://docs.aws.amazon.com/prescriptive-guidance/latest/containers-provision-eks-clusters-terraform/helm-add-ons.html

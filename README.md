@@ -35,13 +35,12 @@ Make sure that you have the required dependencies:
 
 Set the following environment variables:
 
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_DEFAULT_REGION`
-- `AWS_ACCOUNT_ID`
+- `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (unless your AWS CLI is already configured)
+- `AWS_REGION` (required)
+- `AWS_ACCOUNT_ID` (required)
 
 If you don't know your account ID, you can see it with `aws sts get-caller-identity`
-(after settings access key and secret access key environment variables).
+(after configuring the AWS CLI, i.e. by setting the access key and secret access key environment variables).
 
 Create the EKS cluster.
 
@@ -49,7 +48,7 @@ Create the EKS cluster.
 cd cluster
 terraform init
 terraform apply
-aws eks update-kubeconfig --name default
+aws eks update-kubeconfig --name default --alias default
 cd ..
 ```
 
@@ -67,6 +66,7 @@ Create the SQS queue.
 cd queue
 terraform init
 terraform apply
+export QUEUE_URL=$(terraform output -raw queue_url)  # Important! We will use this in other commands below.
 cd ..
 ```
 
@@ -78,14 +78,6 @@ URL, so if you want to create multiple queues, you can do so by changing
 the Terraform workspace. However, if you do that, you will need to adjust
 a few other manifests where the that value might be hardcoded.
 
-
-Set the following environment variable; we will use it in a lot of
-other commands below.
-
-```bash
-QUEUE_URL=https://sqs.${AWS_DEFAULT_REGION}.amazonaws.com/${AWS_ACCOUNT_ID}/${TF_WORKSPACE-default}
-```
-
 Now, we need to start the `queue-watcher` controller. Normally, we would
 build+push an image with the code of that controller; but to simplify things
 a bit, we are going to store the code of the controller in a ConfigMap,
@@ -94,7 +86,7 @@ we don't have to rely on an external image or a registry.
 
 ```bash
 kubectl create configmap queue-watcher \
-        --from-file=queue-watcher \
+        --from-file=./controller \
         --from-literal=QUEUE_URL=$QUEUE_URL
 ```
 
@@ -119,7 +111,7 @@ aws sqs send-message --queue-url $QUEUE_URL \
     --message-body '{"target": "127.0.0.2", "duration": "20"}'
 ```
 
-Check that  jobs and pods and created...
+Check that jobs and pods are created...
 ```bash
 watch kubectl get jobs,pods
 ```
