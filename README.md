@@ -170,6 +170,8 @@ kubectl get jobs \
   -o=jsonpath='{.items[?(@.status.conditions[].type=="Failed")].metadata.name}'
 ```
 
+#### Requeueing failed jobs
+
 We can requeue a single failed job like this:
 
 ```bash
