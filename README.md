@@ -57,8 +57,8 @@ Note: this usually takes at least 10-15 minutes to complete.
 Note: the name of the cluster (`default` in the example above) corresponds
 to the name of the Terraform workspace. If you want to deploy multiple
 clusters, you can change the Terraform workspace, and it should deploy
-another set of resources. You will also have to set `TF_VAR_cluster` when
-running Terraform commands in the `queue` subdirectory.
+another set of resources. You will also have to set `TF_VAR_cluster` environment
+variable when running Terraform commands in the `queue` subdirectory.
 
 Create the SQS queue.
 
