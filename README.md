@@ -57,8 +57,8 @@ Note: this usually takes at least 10-15 minutes to complete.
 Note: the name of the cluster (`default` in the example above) corresponds
 to the name of the Terraform workspace. If you want to deploy multiple
 clusters, you can change the Terraform workspace, and it should deploy
-another set of resources. You will also have to edit the cluster name
-in `queue/main.tf`.
+another set of resources. You will also have to set `TF_VAR_cluster` when
+running Terraform commands in the `queue` subdirectory.
 
 Create the SQS queue.
 
@@ -73,10 +73,11 @@ cd ..
 This Terraform configuration creates an SQS queue and an IAM role with
 minimally scoped permissions.
 
-Note: the name of the Terraform workspace will be part of the queue
-URL, so if you want to create multiple queues, you can do so by changing
-the Terraform workspace. However, if you do that, you will need to adjust
-a few other manifests where the that value might be hardcoded.
+Note: the value of the `namespace` variable will be part of the queue
+URL, so if you want to create multiple queues, you can do so by setting
+the `TF_VAR_namespace` environment variable when running Terraform commands
+in the `queue` subdirectory. However, if you do that, you will
+need to adjust a few other manifests where that value might be hardcoded.
 
 Now, we need to start the `queue-watcher` controller. Normally, we would
 build+push an image with the code of that controller; but to simplify things

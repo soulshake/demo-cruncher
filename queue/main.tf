@@ -1,17 +1,30 @@
+# Note: variable values can be overridden by setting `TF_VAR_varname` environment variables, for example: `export TF_VAR_cluster=fancy`
+variable "cluster" {
+  default     = "default"
+  description = "Name of the cluster where resources should be deployed."
+  type        = string
+}
+
+variable "namespace" {
+  default     = "default"
+  description = "Kubernetes namespace where resources will be created."
+  type        = string
+}
+
 locals {
   id          = data.aws_caller_identity.current.account_id
-  oidc_issuer = replace(data.aws_eks_cluster.default.identity[0].oidc[0].issuer, "https://", "")
+  oidc_issuer = replace(data.aws_eks_cluster.current.identity[0].oidc[0].issuer, "https://", "")
 }
 
 # SQS queue
 resource "aws_sqs_queue" "queue" {
-  name = terraform.workspace
+  name = var.namespace
 }
 
 # Roles
 resource "aws_iam_role" "queue_watcher" {
-  name               = "queue-watcher-${terraform.workspace}"
-  description        = "queue-watcher role for ${terraform.workspace}"
+  name               = "queue-watcher-${var.namespace}"
+  description        = "queue-watcher role for ${var.namespace}"
   assume_role_policy = trimspace(data.aws_iam_policy_document.assume_role_with_oidc.json)
 }
 
@@ -30,7 +43,7 @@ data "aws_iam_policy_document" "assume_role_with_oidc" {
       test     = "StringEquals"
       variable = "${local.oidc_issuer}:sub"
       values = [
-        "system:serviceaccount:${terraform.workspace}:queue-watcher",
+        "system:serviceaccount:${var.namespace}:queue-watcher",
       ]
     }
   }
