@@ -148,7 +148,6 @@ Look at the job status:
 
 ```bash
 kubectl get jobs -o custom-columns=NAME:metadata.name,COMMAND:spec.template.spec.containers[0].command,STATUS:status.conditions[0].type
-
 ```
 
 At some point, the "invalid" jobs will show a status of `Failed`.
@@ -215,9 +214,9 @@ zones, you may be able to get up to 9 nodes.
 You can also view AWS autoscaling activity:
 
 ```bash
-watch aws autoscaling describe-scaling-activities --output=table \
-      --query 'Activities | sort_by(@, &StartTime)[].
-              [StartTime,AutoScalingGroupName,Description,StatusCode]'
+watch "aws autoscaling describe-scaling-activities --output=table" \
+      "--query 'Activities | sort_by(@, &StartTime)[].
+              [StartTime,AutoScalingGroupName,Description,StatusCode]'"
 ```
 
 Normally, you should see a few nodes come up; and after all the
