@@ -87,7 +87,8 @@ the `TF_VAR_namespace` environment variable when running Terraform commands
 in the `queue` subdirectory. However, if you do that, you will
 need to adjust a few other manifests where that value might be hardcoded.
 
-#### Create the queue-watcher controller
+
+#### Start the queue-watcher controller
 
 Now, we need to start the `queue-watcher` controller. Normally, we would
 build+push an image with the code of that controller; but to simplify things
@@ -101,9 +102,7 @@ kubectl create configmap queue-watcher \
         --from-literal=QUEUE_URL=$QUEUE_URL
 ```
 
-#### Start the queue-watcher controller
-
-We can now start the `queue-watcher` controller:
+We can now run the `queue-watcher` controller:
 
 ```bash
 envsubst < controller/queue-watcher.yaml | kubectl apply -f-
