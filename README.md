@@ -274,7 +274,10 @@ export TF_VAR_availability_zones='["a", "b"]'
 
 Then plan/apply in the `cluster` directory.
 
-Warning: due to particularities of the Terraform Kubernetes provider, changing values that result in cluster replacement (e.g. changing the value of `var.availability_zones`) after the cluster resources have been created will cause errors regarding Helm resources during planning. In this case, do a targeted apply first, like: `terraform apply -target aws_eks_cluster.current`.
+Warning: due to particularities of the Terraform Helm provider, changing values that result
+in cluster replacement (e.g. changing the value of `var.availability_zones`) after the cluster
+resources have been created will cause errors regarding Helm resources during planning. In
+this case, do a targeted apply first, like: `terraform apply -target aws_eks_cluster.current`.
 
 ### Purging the SQS queue
 
