@@ -8,9 +8,11 @@ It uses AWS EKS and AWS SQS.
 ## Architecture overview
 
 For each task to execute, a message is posted in the SQS queue.
-A deployment (`queue-watcher`) regularly polls that queue and receives these messages.
-This deployment could be considered a custom controller. For each message, `queue-watcher`
-creates a Kubernetes Job, then deletes the message from the queue.
+A custom controller (`queue-watcher`) watches that queue and receives these messages.
+In our examples below, this custom controller runs in a Deployment;
+but it can also run locally for development or testing.
+For each message, `queue-watcher` creates a Kubernetes Job,
+then deletes the message from the queue.
 
 Then the Kubernetes Job controller kicks in, and runs the requested tasks in Pods.
 If enough Pods are created, they will fill up the available cluster capacity,
